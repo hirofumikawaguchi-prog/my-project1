@@ -1,0 +1,25 @@
+{
+  "meetingId": "20260806-093000_project-kickoff",
+  "tasks": [
+    {
+      "id": "task-0001",
+      "title": "要件定義書のレビュー",
+      "assignee": "山田太郎",
+      "dueDate": "2026-08-10",
+      "status": "not_started",
+      "createdAt": "2026-08-06T10:31:00+09:00",
+      "updatedAt": "2026-08-06T10:31:00+09:00",
+      "updatedBy": "川口博文"
+    },
+    {
+      "id": "task-0002",
+      "title": "実装環境のセットアップ",
+      "assignee": "川口博文",
+      "dueDate": "2026-08-08",
+      "status": "in_progress",
+      "createdAt": "2026-08-06T10:32:00+09:00",
+      "updatedAt": "2026-08-06T10:32:00+09:00",
+      "updatedBy": "川口博文"
+    }
+  ]
+}
