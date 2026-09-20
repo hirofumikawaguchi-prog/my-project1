@@ -1,0 +1,35 @@
+{
+  "meetingId": "20260801-140000_weekly-sync",
+  "tasks": [
+    {
+      "id": "task-0001",
+      "title": "レビュー対応完了",
+      "assignee": "山田太郎",
+      "dueDate": "2026-08-04",
+      "status": "in_progress",
+      "createdAt": "2026-08-01T15:00:00+09:00",
+      "updatedAt": "2026-08-01T15:00:00+09:00",
+      "updatedBy": "川口博文"
+    },
+    {
+      "id": "task-0002",
+      "title": "資料作成",
+      "assignee": "佐藤花子",
+      "dueDate": "2026-08-03",
+      "status": "done",
+      "createdAt": "2026-08-01T15:00:00+09:00",
+      "updatedAt": "2026-08-02T09:00:00+09:00",
+      "updatedBy": "佐藤花子"
+    },
+    {
+      "id": "task-0003",
+      "title": "次回定例のアジェンダ作成",
+      "assignee": "佐藤花子",
+      "dueDate": "2026-08-07",
+      "status": "not_started",
+      "createdAt": "2026-08-01T15:00:00+09:00",
+      "updatedAt": "2026-08-01T15:00:00+09:00",
+      "updatedBy": "川口博文"
+    }
+  ]
+}

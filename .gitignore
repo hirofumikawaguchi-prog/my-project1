@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 pn_junction.png
+
+# Node.js / Web app (server, frontend)
+node_modules/
+frontend/dist/
+*.log

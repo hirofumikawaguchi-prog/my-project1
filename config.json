@@ -1,0 +1,10 @@
+{
+  "port": 4000,
+  "meetingsPath": "./meetings",
+  "dueSoonDays": 3,
+  "users": [
+    "川口博文",
+    "山田太郎",
+    "佐藤花子"
+  ]
+}
