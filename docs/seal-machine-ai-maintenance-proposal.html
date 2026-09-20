@@ -1,0 +1,761 @@
+<title>通信機能付きシール機×AIリアルタイムメンテナンス構成案</title>
+<style>
+  :root {
+    --bg: #F2F4F5;
+    --bg-panel: #FFFFFF;
+    --bg-diagram: #E9EFF2;
+    --bg-diagram-grid: #D7E1E6;
+    --text: #1B2430;
+    --text-muted: #5B6672;
+    --text-faint: #8590A0;
+    --border: #C9D2D8;
+    --border-strong: #9FADB6;
+    --accent-heat: #B9531D;
+    --accent-heat-soft: #F2DECB;
+    --accent-data: #2C5282;
+    --accent-data-soft: #DCE6F2;
+    --success: #2F7D52;
+    --success-soft: #DCEEE2;
+    --warning: #A9711C;
+    --warning-soft: #F3E6CC;
+    --critical: #B23A3A;
+    --critical-soft: #F5DCDC;
+    --mono-bg: #E7EBEC;
+    --shadow: 0 1px 2px rgba(20,30,40,0.06), 0 6px 16px rgba(20,30,40,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181D;
+      --bg-panel: #1A2027;
+      --bg-diagram: #171D24;
+      --bg-diagram-grid: #232B33;
+      --text: #E7ECEF;
+      --text-muted: #A3AEB8;
+      --text-faint: #7A8590;
+      --border: #2B333B;
+      --border-strong: #3C4750;
+      --accent-heat: #E08A52;
+      --accent-heat-soft: #3A2A1E;
+      --accent-data: #7FA8D9;
+      --accent-data-soft: #1E2C3D;
+      --success: #55B183;
+      --success-soft: #1D2E25;
+      --warning: #D9A441;
+      --warning-soft: #332A18;
+      --critical: #E2685F;
+      --critical-soft: #35201F;
+      --mono-bg: #20262D;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181D;
+    --bg-panel: #1A2027;
+    --bg-diagram: #171D24;
+    --bg-diagram-grid: #232B33;
+    --text: #E7ECEF;
+    --text-muted: #A3AEB8;
+    --text-faint: #7A8590;
+    --border: #2B333B;
+    --border-strong: #3C4750;
+    --accent-heat: #E08A52;
+    --accent-heat-soft: #3A2A1E;
+    --accent-data: #7FA8D9;
+    --accent-data-soft: #1E2C3D;
+    --success: #55B183;
+    --success-soft: #1D2E25;
+    --warning: #D9A441;
+    --warning-soft: #332A18;
+    --critical: #E2685F;
+    --critical-soft: #35201F;
+    --mono-bg: #20262D;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: "YuMincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+    font-weight: 600;
+    text-wrap: balance;
+    color: var(--text);
+    margin: 0;
+  }
+  .mono {
+    font-family: "SF Mono", "Menlo", "Consolas", "Noto Sans Mono CJK JP", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: var(--accent-data); }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  .hero {
+    padding: 56px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-heat);
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+  .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-heat);
+    display: inline-block;
+  }
+  .hero h1 {
+    font-size: clamp(26px, 4vw, 38px);
+    line-height: 1.35;
+    max-width: 900px;
+  }
+  .hero .sub {
+    margin-top: 16px;
+    color: var(--text-muted);
+    font-size: 16px;
+    max-width: 720px;
+  }
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    margin-top: 28px;
+    font-size: 13px;
+    color: var(--text-faint);
+  }
+  .hero-meta strong {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  /* ---------- Table of contents (static block, no sticky/grid split) ---------- */
+  .toc {
+    margin: 36px 0 44px;
+    padding: 20px 24px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-panel);
+    box-shadow: var(--shadow);
+  }
+  .toc-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 14px;
+    font-weight: 700;
+  }
+  .toc > ol {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px 32px;
+  }
+  .toc > ol > li {
+    border-left: 2px solid var(--border);
+    padding-left: 12px;
+  }
+  .toc li { margin: 0; }
+  .toc > ol > li > a {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+    padding-bottom: 2px;
+  }
+  .toc a:hover { color: var(--accent-data); }
+  .toc .sub-list {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+  }
+  .toc .sub-list a {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--text-muted);
+    padding: 3px 0;
+  }
+
+  main { min-width: 0; }
+  section { margin-bottom: 56px; scroll-margin-top: 24px; }
+  section h2 {
+    font-size: 22px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  section h2 .num {
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 14px;
+    color: var(--accent-heat);
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 16.5px;
+    margin: 28px 0 12px;
+    color: var(--text);
+  }
+  h3 .num { color: var(--accent-data); font-family: "SF Mono", monospace; font-size: 13px; margin-right: 6px; }
+  p { margin: 0 0 14px; max-width: 760px; }
+  ul.plain, ol.plain { margin: 0 0 14px; padding-left: 22px; max-width: 760px; }
+  ul.plain li, ol.plain li { margin-bottom: 6px; }
+
+  .lede {
+    font-size: 16.5px;
+    color: var(--text-muted);
+    max-width: 760px;
+  }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border-left: 3px solid var(--accent-heat);
+    background: var(--accent-heat-soft);
+    padding: 14px 18px;
+    border-radius: 4px;
+    max-width: 760px;
+    font-size: 14px;
+    color: var(--text);
+    margin: 4px 0 18px;
+  }
+  .callout.data { border-left-color: var(--accent-data); background: var(--accent-data-soft); }
+  .callout strong { font-weight: 700; }
+
+  /* ---------- Diagram ---------- */
+  .diagram-wrap {
+    background: var(--bg-diagram);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 8px 8px;
+    box-shadow: var(--shadow);
+  }
+  .diagram-wrap svg { width: 100%; height: auto; display: block; }
+  .diagram-caption {
+    font-size: 12.5px;
+    color: var(--text-faint);
+    padding: 10px 12px 4px;
+  }
+
+  /* ---------- Cards / layer blocks ---------- */
+  .layer-card {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+  }
+  .layer-card:first-of-type { border-top: none; }
+  .layer-tag {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--accent-data);
+    padding-top: 3px;
+  }
+  .layer-card.hw .layer-tag { color: var(--accent-heat); }
+
+  /* ---------- Tables ---------- */
+  .table-scroll { overflow-x: auto; max-width: 100%; margin-bottom: 20px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    background: var(--bg-panel);
+  }
+  caption {
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  th, td {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+  thead th {
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border-strong);
+    font-weight: 700;
+  }
+  tbody tr:hover { background: var(--accent-data-soft); }
+  td.mono, th.mono { font-size: 12.8px; color: var(--text-muted); }
+
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
+  }
+  .pill.ok { background: var(--success-soft); color: var(--success); }
+  .pill.warn { background: var(--warning-soft); color: var(--warning); }
+  .pill.crit { background: var(--critical-soft); color: var(--critical); }
+
+  /* ---------- Roadmap timeline ---------- */
+  .roadmap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-left: 2px solid var(--border-strong);
+    margin-left: 6px;
+    max-width: 800px;
+  }
+  .phase {
+    position: relative;
+    padding: 4px 0 28px 28px;
+  }
+  .phase::before {
+    content: "";
+    position: absolute;
+    left: -7px; top: 4px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--accent-heat);
+  }
+  .phase .phase-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .phase .phase-num {
+    font-family: "SF Mono", monospace;
+    font-size: 12px;
+    color: var(--accent-heat);
+    font-weight: 700;
+  }
+  .phase .phase-title { font-weight: 700; font-size: 15px; }
+  .phase .phase-dur {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-left: auto;
+  }
+  .phase p { font-size: 13.8px; color: var(--text-muted); margin-bottom: 8px; }
+
+  /* ---------- Compare grid ---------- */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 16px;
+    max-width: 820px;
+  }
+  .compare-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .compare-card h4 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: var(--accent-data);
+    font-weight: 700;
+  }
+  .compare-card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); }
+  .compare-card ul li { margin-bottom: 6px; }
+
+  footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+</style>
+
+<div class="page">
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span>System Architecture Proposal</div>
+    <h1>通信機能付きシール機（PIC制御）× PC によるAIリアルタイムメンテナンス構成案</h1>
+    <p class="sub">現場のインパルスシーラーが持つ通信機能とPICの内部信号を活用し、PC・クラウド上のAIで異常検知と予知保全をリアルタイムに行うための、5層アーキテクチャの提案です。</p>
+    <div class="hero-meta">
+      <div><strong>対象機器</strong>&nbsp; 通信機能付きシール機（PIC18F2550制御）</div>
+      <div><strong>用途</strong>&nbsp; リアルタイム異常検知・予知保全</div>
+      <div><strong>作成日</strong>&nbsp; 2026-08-08</div>
+    </div>
+  </header>
+
+  <nav class="toc">
+      <div class="toc-label">目次</div>
+      <ol>
+        <li><a href="#overview">1. 提案の全体像</a></li>
+        <li><a href="#architecture">2. システム構成図</a></li>
+        <li><a href="#layers">3. レイヤー別構成</a>
+          <ol class="sub-list">
+            <li><a href="#layer-device">3.1 シール機側（PIC）</a></li>
+            <li><a href="#layer-comm">3.2 通信層</a></li>
+            <li><a href="#layer-pc">3.3 PCエッジゲートウェイ</a></li>
+            <li><a href="#layer-cloud">3.4 クラウド/サーバー層</a></li>
+            <li><a href="#layer-ui">3.5 ダッシュボード・通知</a></li>
+          </ol>
+        </li>
+        <li><a href="#ai">4. AI手法（異常検知・予知保全）</a></li>
+        <li><a href="#data">5. 監視データ項目</a></li>
+        <li><a href="#safety">6. セキュリティと安全性</a></li>
+        <li><a href="#roadmap">7. 導入フェーズ</a></li>
+        <li><a href="#alternatives">8. 構成の代替案</a></li>
+      </ol>
+  </nav>
+
+  <main>
+      <section id="overview">
+        <h2><span class="num">01</span>提案の全体像</h2>
+        <p class="lede">シール機自体は「熱と圧力で溶着する」というシンプルな物理プロセスですが、故障の予兆は電流・温度・時間といった信号の微妙なドリフトとして現れます。これを人手のログ確認ではなくAIに常時監視させ、故障の「前」に知らせる仕組みを作るのが本提案の狙いです。</p>
+        <p>基本方針は次の3点です。</p>
+        <ul class="plain">
+          <li><strong>安全はハードウェア、判断はAI。</strong> 過昇温遮断やヒューズなど既存の安全機構はそのまま維持し、AIは「助言・通知」に徹します。AIの誤判定が停止事故につながらない構成にします。</li>
+          <li><strong>PIC側は「測って送る」に専念。</strong> 演算負荷の高い異常検知・学習はPC／クラウド側に置き、PICファームウェアの改修は最小限（センサー読み取りとテレメトリ送信）に留めます。</li>
+          <li><strong>1台のPoCから段階的に拡張。</strong> まずPC1台・シール機1台でしきい値ベースの監視を立ち上げ、データが蓄積してから機械学習モデルへ移行します。</li>
+        </ul>
+      </section>
+
+      <section id="architecture">
+        <h2><span class="num">02</span>システム構成図</h2>
+        <div class="diagram-wrap">
+          <svg viewBox="0 0 1180 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="シール機からPC、クラウド、ダッシュボードまでのデータフロー図">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"></path>
+              </marker>
+              <marker id="arrow-heat" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-heat)"></path>
+              </marker>
+              <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M0 0 H24 M0 0 V24" fill="none" stroke="var(--bg-diagram-grid)" stroke-width="1"></path>
+              </pattern>
+            </defs>
+            <rect x="0" y="0" width="1180" height="480" fill="url(#grid)"></rect>
+
+            <!-- Stage 1: Sealer -->
+            <g>
+              <rect x="24" y="150" width="190" height="120" rx="6" fill="var(--bg-panel)" stroke="var(--accent-heat)" stroke-width="1.6"></rect>
+              <path d="M24 150 l14 0 M24 150 l0 14" stroke="var(--accent-heat)" stroke-width="2" fill="none"></path>
+              <path d="M214 270 l-14 0 M214 270 l0 -14" stroke="var(--accent-heat)" stroke-width="2" fill="none"></path>
+              <text x="119" y="182" text-anchor="middle" class="mono" style="font-size:11px; letter-spacing:0.06em; fill:var(--accent-heat); font-weight:700;">EDGE DEVICE</text>
+              <text x="119" y="208" text-anchor="middle" style="font-size:15px; fill:var(--text); font-weight:700; font-family: 'YuMincho','Hiragino Mincho ProN',serif;">シール機</text>
+              <text x="119" y="228" text-anchor="middle" style="font-size:12.5px; fill:var(--text-muted);">PIC制御ボード</text>
+              <text x="119" y="248" text-anchor="middle" class="mono" style="font-size:11px; fill:var(--text-faint);">電流/温度/時間センサ</text>
+            </g>
+
+            <line x1="214" y1="200" x2="286" y2="200" stroke="var(--text-muted)" stroke-width="1.6" marker-end="url(#arrow)"></line>
+            <text x="250" y="185" text-anchor="middle" class="mono" style="font-size:10.5px; fill:var(--text-faint);">USB-HID</text>
+            <text x="250" y="198" text-anchor="middle" class="mono" style="font-size:9.5px; fill:var(--accent-heat);">(Hub, 最大15台)</text>
+
+            <!-- Stage 2: Comm -->
+            <g>
+              <rect x="286" y="160" width="150" height="100" rx="6" fill="var(--bg-panel)" stroke="var(--border-strong)" stroke-width="1.4"></rect>
+              <text x="361" y="192" text-anchor="middle" class="mono" style="font-size:11px; letter-spacing:0.06em; fill:var(--text-faint); font-weight:700;">TRANSPORT</text>
+              <text x="361" y="216" text-anchor="middle" style="font-size:14px; fill:var(--text); font-weight:700; font-family: 'YuMincho','Hiragino Mincho ProN',serif;">通信層</text>
+              <text x="361" y="236" text-anchor="middle" style="font-size:11.5px; fill:var(--text-muted);">USBハブ集約</text>
+            </g>
+
+            <line x1="436" y1="210" x2="500" y2="210" stroke="var(--text-muted)" stroke-width="1.6" marker-end="url(#arrow)"></line>
+
+            <!-- Stage 3: PC gateway -->
+            <g>
+              <rect x="500" y="120" width="220" height="180" rx="6" fill="var(--bg-panel)" stroke="var(--accent-data)" stroke-width="1.8"></rect>
+              <path d="M500 120 l14 0 M500 120 l0 14" stroke="var(--accent-data)" stroke-width="2" fill="none"></path>
+              <path d="M720 300 l-14 0 M720 300 l0 -14" stroke="var(--accent-data)" stroke-width="2" fill="none"></path>
+              <text x="610" y="150" text-anchor="middle" class="mono" style="font-size:11px; letter-spacing:0.06em; fill:var(--accent-data); font-weight:700;">EDGE COMPUTE</text>
+              <text x="610" y="176" text-anchor="middle" style="font-size:16px; fill:var(--text); font-weight:700; font-family: 'YuMincho','Hiragino Mincho ProN',serif;">PC エッジゲートウェイ</text>
+              <text x="610" y="200" text-anchor="middle" style="font-size:12px; fill:var(--text-muted);">時系列DB（収集・保管）</text>
+              <text x="610" y="222" text-anchor="middle" style="font-size:12px; fill:var(--text-muted);">特徴量抽出・軽量推論</text>
+              <text x="610" y="244" text-anchor="middle" style="font-size:12px; fill:var(--text-muted);">ローカルダッシュボード</text>
+              <text x="610" y="270" text-anchor="middle" class="mono" style="font-size:10.5px; fill:var(--text-faint);">即時アラート判定（数秒〜数十秒）</text>
+            </g>
+
+            <!-- feedback dashed arrow -->
+            <path d="M580 300 C 480 340, 260 340, 130 275" fill="none" stroke="var(--accent-heat)" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#arrow-heat)"></path>
+            <text x="355" y="358" text-anchor="middle" style="font-size:11px; fill:var(--accent-heat);">助言通知のみ（安全停止はハード側で独立に担保）</text>
+
+            <line x1="720" y1="180" x2="800" y2="180" stroke="var(--text-muted)" stroke-width="1.6" marker-end="url(#arrow)"></line>
+            <text x="760" y="170" text-anchor="middle" class="mono" style="font-size:10.5px; fill:var(--text-faint);">TLS/MQTT</text>
+
+            <!-- Stage 4: cloud -->
+            <g>
+              <rect x="800" y="120" width="180" height="100" rx="6" fill="var(--bg-panel)" stroke="var(--border-strong)" stroke-width="1.4"></rect>
+              <text x="890" y="150" text-anchor="middle" class="mono" style="font-size:11px; letter-spacing:0.06em; fill:var(--text-faint); font-weight:700;">FLEET</text>
+              <text x="890" y="174" text-anchor="middle" style="font-size:14px; fill:var(--text); font-weight:700; font-family: 'YuMincho','Hiragino Mincho ProN',serif;">クラウド/サーバー</text>
+              <text x="890" y="196" text-anchor="middle" style="font-size:11.5px; fill:var(--text-muted);">学習・複数台集約</text>
+            </g>
+
+            <line x1="890" y1="220" x2="890" y2="270" stroke="var(--text-muted)" stroke-width="1.6" marker-end="url(#arrow)"></line>
+
+            <!-- Stage 5: dashboard/notification -->
+            <g>
+              <rect x="800" y="280" width="180" height="90" rx="6" fill="var(--bg-panel)" stroke="var(--border-strong)" stroke-width="1.4"></rect>
+              <text x="890" y="308" text-anchor="middle" class="mono" style="font-size:11px; letter-spacing:0.06em; fill:var(--text-faint); font-weight:700;">ACTION</text>
+              <text x="890" y="332" text-anchor="middle" style="font-size:14px; fill:var(--text); font-weight:700; font-family: 'YuMincho','Hiragino Mincho ProN',serif;">通知・保守指示</text>
+              <text x="890" y="352" text-anchor="middle" style="font-size:11.5px; fill:var(--text-muted);">メール/Slack/Teams</text>
+            </g>
+
+            <line x1="720" y1="240" x2="800" y2="325" stroke="var(--text-muted)" stroke-width="1.6" marker-end="url(#arrow)"></line>
+            <text x="775" y="262" text-anchor="middle" class="mono" style="font-size:10px; fill:var(--text-faint);">即時通知</text>
+          </svg>
+          <div class="diagram-caption">図: シール機（PIC）→ 通信層 → PCエッジゲートウェイ → クラウド → ダッシュボード/通知の5段構成。破線は助言的フィードバックのみで、機械停止などの安全動作はPIC側ハードウェアで独立に確保する。</div>
+        </div>
+      </section>
+
+      <section id="layers">
+        <h2><span class="num">03</span>レイヤー別構成</h2>
+
+        <div id="layer-device" class="layer-card hw">
+          <div class="layer-tag">3.1<br>Device</div>
+          <div>
+            <h3>シール機側（PIC制御・エッジデバイス）</h3>
+            <p>既存のPICファームウェアに、以下の役割を追加します。既存の制御ロジック（加熱・加圧・冷却シーケンス）自体は変更せず、「測定値の外部送信」だけを追加する形が現実的です。</p>
+            <ul class="plain">
+              <li><strong>センシング:</strong> ヒーター電流（シャント/CT）、ヒーター電圧、シールバー温度（既存の温調用サーミスタを共用可）、加圧ストローク、サイクルタイマー値をADC/タイマーから取得。</li>
+              <li><strong>タイムスタンプ付与とフレーミング:</strong> PIC内でリアルタイムクロック（RTCなければサイクル番号で代用）を付け、機体ID・エラーコード・CRC16を含む固定長バイナリフレームに整形。PICのCPU/メモリ負荷を抑えるため、JSONではなく軽量バイナリを推奨。</li>
+              <li><strong>送信:</strong> 既存の通信機能（多くはUART/RS-232系）経由でPCへ1サイクルごと、または一定周期（例: 100ms〜1s）で送信。</li>
+            </ul>
+            <div class="callout">
+              <strong>ポイント:</strong> AIのための改修はPIC側では最小限に。安全機構（サーモスタット、ヒューズ、ソフトウェアの過昇温保護）は現状のまま独立に維持し、AI側の判断ロジックに依存させないこと。
+            </div>
+
+            <h3 style="margin-top:32px;"><span class="num">3.1.1</span>PIC18F2550 実装仕様</h3>
+            <p>18F2550は28pin品でオンチップのフルスピードUSBを持つのが特徴です。この特性を踏まえたペリフェラル割り当て案です。</p>
+            <div class="table-scroll">
+              <table>
+                <caption>ペリフェラル割り当て</caption>
+                <thead><tr><th>ペリフェラル/ピン</th><th>割り当て</th><th>用途</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">RA0/AN0</td><td>電流センサー出力（ACS712等ホール式）</td><td>ヒーター電流監視・寿命トレンド</td></tr>
+                  <tr><td class="mono">RA1/AN1</td><td>シールバー温度（既存サーミスタ流用）</td><td>温度プロファイル異常検知</td></tr>
+                  <tr><td class="mono">RA2/AN2</td><td>周囲温度</td><td>環境補正</td></tr>
+                  <tr><td class="mono">RA3/AN3</td><td>加圧ストローク/圧力センサー（任意）</td><td>機械摩耗トレンド</td></tr>
+                  <tr><td class="mono">RC4(D-)/RC5(D+)</td><td>オンチップUSB（フルスピード・HIDクラス、実装済み）</td><td>PC直結・PoC標準経路（外部USB-シリアルIC・追加ドライバ不要）</td></tr>
+                  <tr><td class="mono">RC6(TX)/RC7(RX) EUSART</td><td>外付けMAX485経由でRS-485、またはWi-Fiブリッジ</td><td>複数台バス接続・ネットワーク接続時</td></tr>
+                  <tr><td class="mono">OSC1/OSC2</td><td>外部水晶（例: 20MHz）+ HSPLL</td><td>USB使用時は内蔵発振器不可。USB基準クロック生成に必須</td></tr>
+                  <tr><td class="mono">Timer0</td><td>ADCサンプリング割り込み（10〜50ms周期）</td><td>特徴量計算の元データ取得</td></tr>
+                  <tr><td class="mono">Timer1</td><td>シール/冷却時間の計測（既存ロジック流用）</td><td>サイクルドリフト検知</td></tr>
+                  <tr><td class="mono">EEPROM 256B</td><td>直近エラーコード・ADC校正値</td><td>電源断復帰時の状態保持</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout data">
+              <strong>チップ側の制約と対策:</strong>
+              <ul class="plain" style="margin-top:8px; margin-bottom:0;">
+                <li>RAMが2KBと小さいため、テレメトリは<strong>溜めずに即送信</strong>。HID Input Reportにそのまま乗る32〜64byte程度の固定長構造体を1つだけ使い回す。</li>
+                <li>ハードFPUが無く浮動小数点はXC8で高コストになるため、移動平均・簡易RMS推定はQ8.8等の<strong>固定小数点演算</strong>で実装する。</li>
+                <li>10bit ADCは電流検出には粗いため、16サンプル程度の<strong>オーバーサンプリング平均</strong>で実効12bit相当まで分解能を上げる。</li>
+                <li>USB HIDスタック（Microchip MLA の USB Device-HID）はCDCより軽量（Flash消費は概ね3〜6KB程度）で、既に実装済みなら流用がそのまま可能。カスタムHID機器として独自VID/PIDでの列挙になるため、PC側アプリはVID/PIDでフィルタして接続する。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="layer-comm" class="layer-card">
+          <div class="layer-tag">3.2<br>Transport</div>
+          <div>
+            <h3>通信層</h3>
+            <p>既存の通信機能は<strong>USB-HID（オンチップ、実装済み）</strong>とのこと。HIDはWindows標準ドライバで動作するためドライバ配布が不要な反面、仮想COMポートではなく<strong>レポート単位</strong>のデータ転送になる点が設計に影響します。複数台接続は<strong>USBハブ経由で最大15台をPC1台に集約</strong>する方針とします。</p>
+            <div class="table-scroll">
+              <table>
+                <caption>通信方式の比較（PIC18F2550・USB-HID前提）</caption>
+                <thead><tr><th>方式</th><th>特徴</th><th>適したケース</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">USB-HID（オンチップ・実装済み）</td><td>追加ドライバ不要（標準HIDドライバ）。Input Report（例: 64byte、1msポーリング目安）でPCへ送信、Output Reportで簡易な助言通知を受信可能。PC側はシリアルAPIではなく<strong>HID API（hidapi等）</strong>で読む</td><td><strong>既存実装をそのまま活用。単機・複数機とも共通の主経路</strong></td></tr>
+                  <tr><td class="mono">USBハブ集約（PC直下1段・最大15台）</td><td>多段カスケードせず、PC直下の1段のみでセルフパワードハブに集約。ポート番号と機体IDを固定対応させやすい。帯域も64byte×15台×10ms間隔≒96KB/sでフルスピード帯域（実効約900KB/s）の1/9程度に留まる</td><td>1台のPCで複数機を一括監視する構成（本提案の標準形）</td></tr>
+                  <tr><td class="mono">EUSART + RS-485/Wi-Fi（参考・任意）</td><td>PCから離れた棟・フロアをまたぐなど、USBの配線距離（実用上5m前後、延長時はアクティブケーブルが必要）を超える場合の代替</td><td>USBの配線距離では届かない拠点をまたぐ場合のみ検討</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>15台規模であればUSB-HID＋ハブ構成のまま帯域・台数上限のどちらにも余裕があるため、RS-485等の追加はPC設置場所からの配線距離がUSBの実用限界を超える場合にのみ検討すれば十分です。</p>
+          </div>
+        </div>
+
+        <div id="layer-pc" class="layer-card">
+          <div class="layer-tag">3.3<br>Gateway</div>
+          <div>
+            <h3>PCエッジゲートウェイ</h3>
+            <p>「リアルタイム性」を担う中心層です。クラウドに依存せず、この1台だけでも監視が完結するように設計します。</p>
+            <ul class="plain">
+              <li><strong>プロトコル変換:</strong> Phase1はUSB HIDレポート（hidapi等のHID APIで受信）、Phase3以降はRS-485/Modbusフレームを受信し、それぞれ正規化したレコードに変換。</li>
+              <li><strong>時系列蓄積:</strong> InfluxDB / TimescaleDB / SQLiteのいずれかにローカル保存（ネットワーク断でもデータを失わない）。</li>
+              <li><strong>特徴量抽出:</strong> 移動平均・移動分散、立ち上がり時間、サイクルタイムのドリフト量などをリアルタイム計算。</li>
+              <li><strong>軽量推論:</strong> しきい値/統計的工程管理（SPC）を最初に実装し、その後Isolation Forestやオートエンコーダ（ONNX Runtime等でエクスポート）へ拡張。</li>
+              <li><strong>ローカル通知:</strong> Web UI（Grafana、または自作の軽量ダッシュボード）で現場オペレーターに即時表示。</li>
+            </ul>
+
+            <h3 style="margin-top:32px;"><span class="num">3.3.1</span>複数台接続（USBハブ・PC直下1段・最大15台）</h3>
+            <ul class="plain">
+              <li><strong>物理構成:</strong> ハブを1段だけPC直下に置き、多段カスケードはしない。具体的には<strong>16〜20ポートの産業用セルフパワードハブ1台</strong>、または<strong>8ポート級ハブ2台をPCの別々のUSBルートポートに接続</strong>（この場合も各ハブはPCの直下でありハブ同士のカスケードではないので「1段」）。セルフパワードにするのは、ロジック基板がUSBバス給電の場合にポート供給力（規格上500mA/ポート）を確保するため。</li>
+              <li><strong>ハブの選定（Multi-TT推奨）:</strong> ハイスピード対応ハブには内部処理方式にSingle-TTとMulti-TTがある。Single-TTは配下の全フルスピード機器が1つのトランザクション・トランスレータを共有するため、台数が増えるとポーリングの詰まりが出やすい。Multi-TTはポートごとに変換器を持つため、15台をぶら下げても互いの通信が干渉しにくい。今回の転送量（後述）自体は小さいが、余裕を持たせるならMulti-TTハブを選ぶ。</li>
+              <li><strong>ポート↔機体IDの固定マッピング:</strong> 1段構成のため「ハブのどの物理ポートに繋いだか」＝「どの機体か」が一意に決まり、多段カスケードのようにポートパスが複雑にならない。設置時にポート番号と機体IDの対応表を1枚作っておけば、現場では「ポート番号を見るだけ」で機体を特定できる。</li>
+              <li><strong>個体識別（ソフト側）:</strong> 全機で同一のVID/PIDになるため、USBディスクリプタの<span class="mono">iSerialNumber</span>にEEPROM保持の機体IDを載せて一意化する。PC側はシリアル番号、または上記のポート番号（<span class="mono">hid_enumerate</span>で取得できるポートパス）で機体を識別する。</li>
+              <li><strong>ポーリング方式:</strong> 起動時に15台分のHIDハンドルを<span class="mono">hid_enumerate</span>等で検出してすべてopenしたまま保持し、決められた順序（＝ポート番号順）で1台ずつreadを呼ぶ「順次ポーリング」を採用する。都度open/closeするより抜き差し検出やオーバーヘッドの面で扱いやすい。</li>
+              <li><strong>帯域の余裕:</strong> 64byte Input Reportを10ms間隔で15台分読んでも合計約96KB/s。フルスピードUSBの実効帯域（概ね900KB/s前後）の1/9程度で、1段・単一ハブに集約しても当面はボトルネックにならない。</li>
+              <li><strong>異常機の扱い:</strong> ある機体でread timeoutが連続した場合はスキップして次の機体へ進み、一定回数連続失敗した時点で「オフライン」フラグを立てて通知する（1台の不応答が全体のポーリングを止めない設計）。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="layer-cloud" class="layer-card">
+          <div class="layer-tag">3.4<br>Cloud</div>
+          <div>
+            <h3>クラウド/サーバー層（複数台運用時）</h3>
+            <p>1台のPoCでは必須ではありませんが、複数拠点・複数台に展開する段階で以下を担います。</p>
+            <ul class="plain">
+              <li>全機体データの集約・長期保管（時系列DB + オブジェクトストレージ）</li>
+              <li>異常検知・RUL（残存寿命）モデルの再学習パイプライン</li>
+              <li>機体間・拠点間の比較分析ダッシュボード</li>
+              <li>保守ワークオーダーの発行、部品発注システムとの連携</li>
+            </ul>
+          </div>
+        </div>
+
+        <div id="layer-ui" class="layer-card">
+          <div class="layer-tag">3.5<br>Action</div>
+          <div>
+            <h3>ダッシュボード・通知</h3>
+            <p>現場向け（今すぐ確認すべきこと）とマネジメント向け（傾向・計画）を分けて設計します。</p>
+            <ul class="plain">
+              <li><strong>現場向け:</strong> シール機の横に置いたPC画面か、タブレットでの簡易表示。異常は色（緑/黄/赤）と一言メッセージで即座に判別できるように。</li>
+              <li><strong>管理者向け:</strong> メール/Slack/Teams通知＋週次サマリー。ヒーター交換予測日、直近の異常発生履歴などをまとめる。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="ai">
+        <h2><span class="num">04</span>AI手法（異常検知・予知保全）</h2>
+        <p class="lede">初日から複雑な学習モデルを入れる必要はありません。データが少ない初期は統計的手法で立ち上げ、蓄積量に応じて段階的に高度化するのが実務的です。</p>
+
+        <h3><span class="num">Step 1</span>統計的しきい値・SPC</h3>
+        <p>ヒーター電流・温度立ち上がり時間・サイクルタイムそれぞれに対し、正常運転時の平均±nσ（管理限界線）を設定。逸脱をルールベースで即時検知します。導入コストが最も低く、最初の1〜2ヶ月はこれだけでも十分に価値があります。</p>
+
+        <h3><span class="num">Step 2</span>教師なし異常検知</h3>
+        <p>複数信号を同時に見たい（電流は正常域だが温度応答だけ遅い、など）場合、Isolation Forestやオートエンコーダ（再構成誤差を異常スコアとする）を導入。ラベル付き故障データが少ない製造現場に適しています。</p>
+
+        <h3><span class="num">Step 3</span>予知保全（RUL予測）</h3>
+        <p>ヒーター線（ニクロム線）の抵抗値トレンド、シール時間の緩やかなドリフト、サイクルごとの立ち上がり時間変化などを特徴量とした回帰モデル（勾配ブースティング、またはサイクル系列であればLSTM）で「あと何サイクルで交換が必要か」を推定します。</p>
+
+        <div class="callout data">
+          <strong>安全性の原則:</strong> どの段階でもAIの出力は「通知・推奨」であり、遮断・停止といった安全動作はPIC側の独立したハード保護（サーモスタット、ヒューズ、既存の過昇温ロジック）に委ねます。AIモデルの誤検知・誤判定が機械の安全機能を代替しない設計とします。
+        </div>
+      </section>
+
+      <section id="data">
+        <h2><span class="num">05</span>監視データ項目</h2>
+        <p>まず取得すべき最小限の信号セットです。既存のPIC回路で計測済みの値（温度、タイマー）は流用し、電流センサーなど未実装のものだけを追加します。</p>
+        <div class="table-scroll">
+          <table>
+            <caption>信号・センサー一覧</caption>
+            <thead><tr><th>項目</th><th>センサー/信号源</th><th>用途</th><th>優先度</th></tr></thead>
+            <tbody>
+              <tr><td>ヒーター電流</td><td class="mono">CT/シャント → PIC ADC</td><td>過昇温・断線検知、ヒーター寿命トレンド</td><td><span class="pill crit">必須</span></td></tr>
+              <tr><td>シールバー温度</td><td class="mono">サーミスタ/熱電対（既存流用）</td><td>温度プロファイル異常検知</td><td><span class="pill crit">必須</span></td></tr>
+              <tr><td>シール時間・冷却時間</td><td class="mono">PIC内部タイマー</td><td>サイクルドリフト検知</td><td><span class="pill crit">必須</span></td></tr>
+              <tr><td>サイクル回数</td><td class="mono">PIC内部カウンタ</td><td>消耗品交換時期の目安</td><td><span class="pill warn">推奨</span></td></tr>
+              <tr><td>エラーコード</td><td class="mono">既存ファームウェア診断</td><td>既知異常の即時通知</td><td><span class="pill warn">推奨</span></td></tr>
+              <tr><td>ヒーター電圧</td><td class="mono">分圧回路 → PIC ADC</td><td>電源側異常の切り分け</td><td><span class="pill warn">推奨</span></td></tr>
+              <tr><td>加圧ストローク/圧力</td><td class="mono">ポテンショ/圧力センサ</td><td>機械摩耗・ばね劣化検知</td><td><span class="pill ok">任意</span></td></tr>
+              <tr><td>周囲温度・湿度</td><td class="mono">サーミスタ/湿度センサ</td><td>環境補正、結露リスク検知</td><td><span class="pill ok">任意</span></td></tr>
+              <tr><td>機体ID・ファームウェア版</td><td class="mono">PIC内部固定値</td><td>個体管理・ロット横断分析</td><td><span class="pill crit">必須</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="safety">
+        <h2><span class="num">06</span>セキュリティと安全性の考え方</h2>
+        <ul class="plain">
+          <li><strong>ネットワーク分離:</strong> シール機とPC間のセグメントは工場LAN・社内LANから論理的に分離（VLANなど）。クラウドへの経路のみゲートウェイPCを介して外部接続する。</li>
+          <li><strong>通信の保護:</strong> PC〜クラウド間はTLS。機体認証にはAPIキーまたは機器証明書を用いる。</li>
+          <li><strong>ファームウェア更新:</strong> PICのOTA/書き換えを行う場合は署名検証を必須とし、未署名イメージを拒否する。</li>
+          <li><strong>安全機能の独立性:</strong> 前述の通り、AIの判断系と機械安全系（過昇温遮断等）は電気的・論理的に分離し、AI側の障害が安全機能に影響しないようにする。</li>
+        </ul>
+      </section>
+
+      <section id="roadmap">
+        <h2><span class="num">07</span>導入フェーズ</h2>
+        <div class="roadmap">
+          <div class="phase">
+            <div class="phase-head"><span class="phase-num">Phase 0</span><span class="phase-title">信号の棚卸しとテレメトリ仕様策定</span><span class="phase-dur">〜2週間</span></div>
+            <p>現行PICファームウェアで既に取れている値（温度、タイマー）と、追加が必要なセンサー（電流など）を洗い出す。通信フレーム仕様を確定。</p>
+          </div>
+          <div class="phase">
+            <div class="phase-head"><span class="phase-num">Phase 1</span><span class="phase-title">PoC: 1台構成でのデータ収集・しきい値監視</span><span class="phase-dur">1〜2ヶ月</span></div>
+            <p>シール機1台＋PC1台で通信を確立し、時系列DBへの蓄積とSPCベースのアラートを立ち上げる。</p>
+          </div>
+          <div class="phase">
+            <div class="phase-head"><span class="phase-num">Phase 2</span><span class="phase-title">機械学習による異常検知の導入</span><span class="phase-dur">2〜3ヶ月</span></div>
+            <p>蓄積データを用いてIsolation Forest/オートエンコーダを学習。ローカルダッシュボードで異常スコアを可視化。</p>
+          </div>
+          <div class="phase">
+            <div class="phase-head"><span class="phase-num">Phase 3</span><span class="phase-title">複数台展開とクラウド集約、RUL予測</span><span class="phase-dur">3〜6ヶ月</span></div>
+            <p>USBハブ経由で最大15台をPC1台に集約、クラウドに集約。ヒーター寿命などの残存寿命予測モデルを追加。</p>
+          </div>
+          <div class="phase">
+            <div class="phase-head"><span class="phase-num">Phase 4</span><span class="phase-title">保守ワークフローへの統合</span><span class="phase-dur">継続運用</span></div>
+            <p>アラート発生時に保守指示・部品発注まで連携するワークフローを構築し、運用を定着させる。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="alternatives">
+        <h2><span class="num">08</span>構成の代替案</h2>
+        <p>PC1台にどこまで持たせるか、クラウドにどこまで任せるかはトレードオフです。導入初期の規模感に応じて選んでください。</p>
+        <div class="compare-grid">
+          <div class="compare-card">
+            <h4>エッジ重視構成（推奨・初期）</h4>
+            <ul>
+              <li>判定はほぼPC上で完結、レイテンシが小さい</li>
+              <li>ネットワーク断でも監視が継続する</li>
+              <li>クラウド利用料が小さく、初期コストを抑えられる</li>
+              <li>複数拠点の横断分析はしづらい</li>
+            </ul>
+          </div>
+          <div class="compare-card">
+            <h4>クラウド重視構成（拡張期）</h4>
+            <ul>
+              <li>複数台・複数拠点のデータを一元管理できる</li>
+              <li>モデルの再学習・展開を中央で統制できる</li>
+              <li>ネットワーク依存が大きく、通信断時のフォールバックが必要</li>
+              <li>台数が増えるほどコスト効率が良くなる</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        通信機能付きシール機（PIC制御）とPCによるAIリアルタイムメンテナンス構成案 — 技術提案ドラフト
+      </footer>
+  </main>
+</div>
