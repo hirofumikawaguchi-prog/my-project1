@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アーケード進化タイムライン</title>
+<style>
+  :root {
+    --bg: #F4F2EE;
+    --bg-panel: #FFFFFF;
+    --text: #1B2430;
+    --text-muted: #5B6672;
+    --text-faint: #8590A0;
+    --border: #D9D4CB;
+    --line: #B9B2A6;
+    --e1: #6B7280;
+    --e2: #2F7D52;
+    --e3: #2C5282;
+    --e4: #6B4FA0;
+    --e5: #0E7C86;
+    --e6: #B9531D;
+    --e7: #C2334A;
+    --icon-bg: #FBFAF7;
+    --shadow: 0 1px 2px rgba(20,30,40,0.06), 0 8px 20px rgba(20,30,40,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171C; --bg-panel: #1B2027;
+      --text: #E9EDF0; --text-muted: #A6B0BA; --text-faint: #7A8590;
+      --border: #2C333C; --line: #48525C;
+      --e1: #A3AAB5; --e2: #6FC497; --e3: #7FA8D9; --e4: #B39DE0;
+      --e5: #5FC3CC; --e6: #E89A62; --e7: #F27C8F;
+      --icon-bg: #20262E; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171C; --bg-panel: #1B2027;
+    --text: #E9EDF0; --text-muted: #A6B0BA; --text-faint: #7A8590;
+    --border: #2C333C; --line: #48525C;
+    --e1: #A3AAB5; --e2: #6FC497; --e3: #7FA8D9; --e4: #B39DE0;
+    --e5: #5FC3CC; --e6: #E89A62; --e7: #F27C8F;
+    --icon-bg: #20262E; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .page { max-width: 1440px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { text-align: center; margin-bottom: 34px; }
+  header .kicker { font-size: 12px; letter-spacing: .25em; color: var(--text-faint); }
+  header h1 { font-size: clamp(22px, 3.2vw, 34px); margin: 6px 0 8px; letter-spacing: .03em; }
+  header p { margin: 0 auto; max-width: 720px; color: var(--text-muted); font-size: 14px; }
+
+  /* ---- 横スクロール枠（時代列と一覧列を同じグリッドで揃える） ---- */
+  .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+  .inner { min-width: 1240px; }
+  .cols { display: grid; grid-template-columns: 110px repeat(7, minmax(0, 1fr)); column-gap: 14px; }
+
+  /* ---- タイムライン（横） ---- */
+  .timeline { padding: 0 17px; }
+  .axis { display: flex; flex-direction: column; justify-content: flex-start; font-size: 12px; color: var(--text-faint); font-weight: 650; }
+  .axis > div:first-child { height: 44px; display: flex; align-items: center; }
+  .axis > div:last-child { margin-top: 16px; padding-top: 16px; }
+  .axis .t { height: 128px; display: flex; align-items: center; color: var(--text-muted); }
+  .era::before {
+    content: ""; position: absolute; top: 106px; left: -7px; right: -7px; height: 4px; background: var(--c);
+  }
+  .axis + .era::before { left: 50%; }
+  .era.future::before {
+    right: -17px; background: repeating-linear-gradient(90deg, var(--c) 0 10px, transparent 10px 18px);
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); height: 10px; top: 103px;
+  }
+  .era { --c: var(--e1); display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+  .era .yr { font-size: 13px; font-weight: 700; color: var(--c); font-variant-numeric: tabular-nums; letter-spacing: .03em; height: 26px; }
+  .era .no { font-size: 11px; color: var(--text-faint); height: 18px; }
+  .icon {
+    width: 128px; height: 128px; border-radius: 50%; background: var(--icon-bg);
+    border: 4px solid var(--c); display: grid; place-items: center; position: relative; z-index: 1;
+    box-shadow: var(--shadow); color: var(--c);
+  }
+  .icon svg { width: 76px; height: 76px; }
+  .era.future .icon { border-style: dashed; }
+  .card {
+    margin-top: 16px; background: var(--bg-panel); border: 1px solid var(--border);
+    border-top: 4px solid var(--c); border-radius: 10px; padding: 12px 12px 14px; width: 100%;
+    box-shadow: var(--shadow); flex: 1;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 2px; color: var(--c); }
+  .card .sym { font-size: 11px; color: var(--text-faint); margin-bottom: 8px; }
+  .card .lead { font-size: 12.5px; margin: 0 0 10px; font-weight: 600; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .tags span { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+  .era.future .card { border-style: dashed; border-top-style: solid; }
+
+  /* ---- 進化帯 ---- */
+  .bands { margin-top: 24px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .band { align-items: center; row-gap: 0; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+  .band:last-child { border-bottom: none; }
+  .band b { font-size: 12px; color: var(--text-muted); font-weight: 650; }
+  .band span { font-size: 12px; text-align: center; padding: 4px 6px; border-radius: 6px; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--text); position: relative; }
+  .band span:not(:last-child)::after { content: "›"; position: absolute; right: -11px; top: 50%; transform: translateY(-52%); color: var(--text-faint); font-size: 14px; }
+
+  .msg { margin-top: 22px; text-align: center; font-size: 14px; color: var(--text-muted); }
+  .msg strong { color: var(--text); }
+  footer { margin-top: 16px; text-align: center; font-size: 11px; color: var(--text-faint); }
+
+  .hint { font-size: 11px; color: var(--text-faint); text-align: right; margin: 4px 0 0; }
+  @media (min-width: 1290px) { .hint { display: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="kicker">ARCADE GAME EVOLUTION 1971 → 2035+</div>
+    <h1>アーケードゲーム 50年の進化と未来</h1>
+    <p>各時代を象徴する1つのシンボルで、白黒の「ピンポン」から AI×XR の体験拠点までをたどる。</p>
+  </header>
+
+  <div class="scroller"><div class="inner">
+  <div class="timeline cols">
+    <div class="axis"><div>年代</div><div class="t">シンボル</div><div>時代の特徴</div></div>
+    <!-- ① -->
+    <div class="era" style="--c: var(--e1)">
+      <div class="yr">1971–1977</div><div class="no">ERA 1</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+          <rect x="5" y="9" width="54" height="40" rx="6"/>
+          <line x1="32" y1="14" x2="32" y2="44" stroke-dasharray="3 4" stroke-width="2"/>
+          <line x1="13" y1="22" x2="13" y2="33"/>
+          <line x1="51" y1="27" x2="51" y2="38"/>
+          <rect x="22" y="22" width="5" height="5" fill="currentColor" stroke="none"/>
+          <line x1="24" y1="49" x2="20" y2="57"/><line x1="40" y1="49" x2="44" y2="57"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>発生期</h2>
+        <div class="sym">シンボル：ピンポン（Pong）</div>
+        <p class="lead">配線そのものがゲーム。「画面を操作できる」こと自体が驚き</p>
+        <div class="tags"><span>TTL回路</span><span>白黒CRT</span><span>バーに1台</span></div>
+      </div>
+    </div>
+
+    <!-- ② -->
+    <div class="era" style="--c: var(--e2)">
+      <div class="yr">1978–1984</div><div class="no">ERA 2</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 11 8" style="width:72px;height:56px" shape-rendering="crispEdges" fill="currentColor">
+          <path d="M2 0h1v1H2zM8 0h1v1H8zM3 1h1v1H3zM7 1h1v1H7zM2 2h7v1H2zM1 3h2v1H1zM4 3h3v1H4zM8 3h2v1H8zM0 4h11v1H0zM0 5h1v1H0zM2 5h7v1H2zM10 5h1v1h-1zM0 6h1v1H0zM2 6h1v1H2zM8 6h1v1H8zM10 6h1v1h-1zM3 7h2v1H3zM6 7h2v1H6z"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>黄金期</h2>
+        <div class="sym">シンボル：インベーダー</div>
+        <p class="lead">8bit CPU でキャラクターとハイスコア文化が誕生</p>
+        <div class="tags"><span>Z80 / 8080</span><span>ゲームセンター誕生</span><span>パックマン</span></div>
+      </div>
+    </div>
+
+    <!-- ③ -->
+    <div class="era" style="--c: var(--e3)">
+      <div class="yr">1985–1993</div><div class="no">ERA 3</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="38" width="52" height="18" rx="4"/>
+          <line x1="20" y1="38" x2="20" y2="20"/>
+          <circle cx="20" cy="15" r="7" fill="currentColor"/>
+          <circle cx="34" cy="47" r="3.5" fill="currentColor"/>
+          <circle cx="43" cy="47" r="3.5" fill="currentColor"/>
+          <circle cx="52" cy="47" r="3.5"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>標準化・体感期</h2>
+        <div class="sym">シンボル：レバー＆ボタン</div>
+        <p class="lead">JAMMA規格で筐体が共通化。対戦格闘が熱狂を生む</p>
+        <div class="tags"><span>JAMMA</span><span>16bit</span><span>ストII</span><span>体感筐体</span></div>
+      </div>
+    </div>
+
+    <!-- ④ -->
+    <div class="era" style="--c: var(--e4)">
+      <div class="yr">1993–2003</div><div class="no">ERA 4</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round">
+          <polygon points="32,5 56,19 56,45 32,59 8,45 8,19"/>
+          <polygon points="32,22 44,40 20,40" fill="currentColor" fill-opacity=".25"/>
+          <line x1="32" y1="5" x2="32" y2="22"/><line x1="56" y1="19" x2="32" y2="22"/><line x1="8" y1="19" x2="32" y2="22"/>
+          <line x1="56" y1="19" x2="44" y2="40"/><line x1="56" y1="45" x2="44" y2="40"/><line x1="32" y1="59" x2="44" y2="40"/>
+          <line x1="32" y1="59" x2="20" y2="40"/><line x1="8" y1="45" x2="20" y2="40"/><line x1="8" y1="19" x2="20" y2="40"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>3D・音ゲー期</h2>
+        <div class="sym">シンボル：ポリゴン</div>
+        <p class="lead">リアルタイム3Dと専用コントローラで「家では無理」な体験へ</p>
+        <div class="tags"><span>3D専用基板</span><span>音ゲー</span><span>プリクラ</span></div>
+      </div>
+    </div>
+
+    <!-- ⑤ -->
+    <div class="era" style="--c: var(--e5)">
+      <div class="yr">2002–2014</div><div class="no">ERA 5</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="26" width="40" height="28" rx="4"/>
+          <rect x="11" y="33" width="10" height="8" rx="1.5" fill="currentColor" fill-opacity=".3"/>
+          <line x1="11" y1="47" x2="34" y2="47"/>
+          <path d="M44 16a10 10 0 0 1 10 10"/>
+          <path d="M44 7a19 19 0 0 1 19 19"/>
+          <circle cx="45" cy="25" r="2.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>ネットワーク・PC化期</h2>
+        <div class="sym">シンボル：ICカード＋通信</div>
+        <p class="lead">筐体がPCになり常時接続。全国対戦とカードで「続けて遊ぶ」へ</p>
+        <div class="tags"><span>x86 / GPU</span><span>全国対戦</span><span>会員ICカード</span><span>DL配信</span></div>
+      </div>
+    </div>
+
+    <!-- ⑥ -->
+    <div class="era" style="--c: var(--e6)">
+      <div class="yr">2015–2026</div><div class="no">ERA 6</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6" y1="6" x2="58" y2="6"/>
+          <rect x="26" y="4" width="12" height="6" rx="2" fill="currentColor"/>
+          <line x1="32" y1="10" x2="32" y2="26"/>
+          <rect x="25" y="26" width="14" height="6" rx="2"/>
+          <path d="M27 32 L19 42 L23 50"/>
+          <path d="M37 32 L45 42 L41 50"/>
+          <circle cx="32" cy="52" r="7" fill="currentColor" fill-opacity=".3"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>体験・プライズ期</h2>
+        <div class="sym">シンボル：クレーンゲーム</div>
+        <p class="lead">スマホ時代に、景品・推し活・VRなど「行く理由」で勝負</p>
+        <div class="tags"><span>プライズ</span><span>キャッシュレス</span><span>VR</span><span>オンクレ</span></div>
+      </div>
+    </div>
+
+    <!-- ⑦ -->
+    <div class="era future" style="--c: var(--e7)">
+      <div class="yr">2027–2035+</div><div class="no">FUTURE（予測）</div>
+      <div class="icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 30c0-5 4-8 9-8h34c5 0 9 3 9 8v6c0 6-4 10-10 10h-6c-3 0-5-2-7-5l-2-2-2 2c-2 3-4 5-7 5h-8C10 46 6 42 6 36z"/>
+          <path d="M50 4 L52.5 10.5 L59 13 L52.5 15.5 L50 22 L47.5 15.5 L41 13 L47.5 10.5 Z" fill="currentColor" stroke="none"/>
+          <circle cx="20" cy="34" r="3" fill="currentColor" stroke="none"/>
+          <circle cx="44" cy="34" r="3" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <div class="card">
+        <h2>クラウド×AI×XR</h2>
+        <div class="sym">シンボル：XRゴーグル＋AI</div>
+        <p class="lead">AIが一人ひとりに体験を生成。店舗は「身体と仲間」の体験拠点に</p>
+        <div class="tags"><span>生成AI</span><span>エッジNPU</span><span>統合ID</span><span>予知保全</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bands">
+    <div class="band cols">
+      <b>演算ハード</b>
+      <span style="--c:var(--e1)">TTL回路</span><span style="--c:var(--e2)">8bit CPU</span><span style="--c:var(--e3)">16bit＋専用チップ</span><span style="--c:var(--e4)">3D専用基板</span><span style="--c:var(--e5)">PC（x86＋GPU）</span><span style="--c:var(--e6)">汎用GPU・SoC</span><span style="--c:var(--e7)">エッジAI＋クラウド</span>
+    </div>
+    <div class="band cols">
+      <b>つながり</b>
+      <span style="--c:var(--e1)">単体</span><span style="--c:var(--e2)">単体</span><span style="--c:var(--e3)">筐体リンク</span><span style="--c:var(--e4)">店内LAN</span><span style="--c:var(--e5)">全国オンライン</span><span style="--c:var(--e6)">スマホ・遠隔</span><span style="--c:var(--e7)">5G/6G・統合ID</span>
+    </div>
+    <div class="band cols">
+      <b>お金の取り方</b>
+      <span style="--c:var(--e1)">1プレイ課金</span><span style="--c:var(--e2)">1プレイ課金</span><span style="--c:var(--e3)">基板・キット販売</span><span style="--c:var(--e4)">メダル・プリクラ</span><span style="--c:var(--e5)">カード＋課金分配</span><span style="--c:var(--e6)">プライズ・電子決済</span><span style="--c:var(--e7)">サブスク・変動価格</span>
+    </div>
+  </div>
+
+  </div></div>
+  <p class="hint">← 横にスクロールできます →</p>
+
+  <p class="msg">変わらない価値は <strong>「家では得られない体験」</strong>。家庭用が追いつくたびに、アーケードは次の体験へ進化してきた。</p>
+  <footer>年代区分・代表例は概略です。2027年以降は現在の動向からの予測です。</footer>
+</div>
+</body>
+</html>

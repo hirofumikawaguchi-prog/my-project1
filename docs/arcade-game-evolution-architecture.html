@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アーケードゲーム進化アーキテクチャ</title>
+<style>
+  :root {
+    --bg: #F2F4F5;
+    --bg-panel: #FFFFFF;
+    --text: #1B2430;
+    --text-muted: #5B6672;
+    --text-faint: #8590A0;
+    --border: #C9D2D8;
+    --border-strong: #9FADB6;
+    --l-exp: #B9531D;   --l-exp-soft: #F6E4D6;
+    --l-sw: #6B4FA0;    --l-sw-soft: #E8E1F3;
+    --l-hw: #2C5282;    --l-hw-soft: #DCE6F2;
+    --l-io: #2F7D52;    --l-io-soft: #DCEEE2;
+    --l-net: #0E7C86;   --l-net-soft: #D5ECEE;
+    --l-biz: #A9711C;   --l-biz-soft: #F3E6CC;
+    --future: #B23A3A;  --future-soft: #FBEDED;
+    --shadow: 0 1px 2px rgba(20,30,40,0.06), 0 6px 16px rgba(20,30,40,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181D; --bg-panel: #1A2027;
+      --text: #E7ECEF; --text-muted: #A3AEB8; --text-faint: #7A8590;
+      --border: #2B333B; --border-strong: #3C4750;
+      --l-exp: #E08A52; --l-exp-soft: #3A2A1E;
+      --l-sw: #B39DE0;  --l-sw-soft: #2A2338;
+      --l-hw: #7FA8D9;  --l-hw-soft: #1E2C3D;
+      --l-io: #6FC497;  --l-io-soft: #1C3328;
+      --l-net: #5FC3CC; --l-net-soft: #173236;
+      --l-biz: #E0B05E; --l-biz-soft: #3A2F1C;
+      --future: #F08080; --future-soft: #3A1F22;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181D; --bg-panel: #1A2027;
+    --text: #E7ECEF; --text-muted: #A3AEB8; --text-faint: #7A8590;
+    --border: #2B333B; --border-strong: #3C4750;
+    --l-exp: #E08A52; --l-exp-soft: #3A2A1E;
+    --l-sw: #B39DE0;  --l-sw-soft: #2A2338;
+    --l-hw: #7FA8D9;  --l-hw-soft: #1E2C3D;
+    --l-io: #6FC497;  --l-io-soft: #1C3328;
+    --l-net: #5FC3CC; --l-net-soft: #173236;
+    --l-biz: #E0B05E; --l-biz-soft: #3A2F1C;
+    --future: #F08080; --future-soft: #3A1F22;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.55;
+  }
+  .page { max-width: 1480px; margin: 0 auto; padding: 28px 16px 48px; }
+  header h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: .02em; }
+  header p { margin: 0; color: var(--text-muted); max-width: 900px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 18px 0 14px; font-size: 12px; color: var(--text-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .board {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  .grid {
+    display: grid; min-width: 1320px;
+    grid-template-columns: 112px repeat(6, minmax(0, 1fr)) minmax(0, 1.25fr);
+  }
+  .cell { padding: 10px 11px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .cell:nth-child(8n) { border-right: none; }
+  .cell ul { margin: 0; padding-left: 1.05em; }
+  .cell li { margin: 0 0 3px; }
+  .cell li::marker { color: var(--text-faint); }
+  .cell b { font-weight: 650; }
+
+  .era { position: relative; padding: 12px 11px 12px 11px; background: var(--bg-panel); }
+  .era .yr { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+  .era .nm { font-size: 15px; font-weight: 700; margin: 2px 0 4px; }
+  .era .ex { font-size: 11.5px; color: var(--text-muted); }
+  .era:not(.corner):not(.fut)::after {
+    content: ""; position: absolute; right: -7px; top: 50%; transform: translateY(-50%);
+    width: 0; height: 0; border-left: 7px solid var(--border-strong);
+    border-top: 7px solid transparent; border-bottom: 7px solid transparent; z-index: 1;
+  }
+  .corner { font-size: 11px; color: var(--text-faint); display: flex; align-items: flex-end; }
+
+  .lbl { font-weight: 700; font-size: 12.5px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .lbl small { font-weight: 400; color: var(--text-muted); font-size: 11px; }
+  .r-exp .lbl { color: var(--l-exp); background: var(--l-exp-soft); }
+  .r-sw  .lbl { color: var(--l-sw);  background: var(--l-sw-soft); }
+  .r-hw  .lbl { color: var(--l-hw);  background: var(--l-hw-soft); }
+  .r-io  .lbl { color: var(--l-io);  background: var(--l-io-soft); }
+  .r-net .lbl { color: var(--l-net); background: var(--l-net-soft); }
+  .r-biz .lbl { color: var(--l-biz); background: var(--l-biz-soft); }
+  .r-exp .cell:not(.lbl) { box-shadow: inset 3px 0 0 var(--l-exp); }
+  .r-sw  .cell:not(.lbl) { box-shadow: inset 3px 0 0 var(--l-sw); }
+  .r-hw  .cell:not(.lbl) { box-shadow: inset 3px 0 0 var(--l-hw); }
+  .r-io  .cell:not(.lbl) { box-shadow: inset 3px 0 0 var(--l-io); }
+  .r-net .cell:not(.lbl) { box-shadow: inset 3px 0 0 var(--l-net); }
+  .r-biz .cell:not(.lbl) { box-shadow: inset 3px 0 0 var(--l-biz); }
+  .row { display: contents; }
+
+  .fut { background: var(--future-soft); }
+  .fut-h { background: var(--future-soft); border-top: 2px dashed var(--future); }
+  .fut-h .nm { color: var(--future); }
+
+  .shift { background: var(--bg); font-size: 11.5px; color: var(--text-muted); }
+  .shift .lbl, .shift.lbl { color: var(--text); background: var(--bg); }
+  .shift strong { color: var(--text); font-weight: 650; }
+
+  .bottom { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; }
+  .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 14px; margin: 0 0 8px; }
+  .card ul { margin: 0; padding-left: 1.1em; font-size: 12.5px; }
+  .card li { margin-bottom: 4px; }
+  .card.f { border-color: var(--future); }
+  .card.f h2 { color: var(--future); }
+
+  .stack { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+  .stack div { border-radius: 6px; padding: 6px 10px; border-left: 4px solid; }
+  .stack .s1 { background: var(--l-exp-soft); border-color: var(--l-exp); }
+  .stack .s2 { background: var(--l-io-soft);  border-color: var(--l-io); }
+  .stack .s3 { background: var(--l-net-soft); border-color: var(--l-net); }
+  .stack .s4 { background: var(--l-sw-soft);  border-color: var(--l-sw); }
+  .stack .s5 { background: var(--l-biz-soft); border-color: var(--l-biz); }
+
+  .hint { font-size: 11px; color: var(--text-faint); margin: 6px 2px 0; }
+  footer { margin-top: 18px; font-size: 11px; color: var(--text-faint); }
+  @media (min-width: 1360px) { .hint { display: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>アーケードゲーム 発生から将来までの進化アーキテクチャ</h1>
+    <p>横軸に時代（1971 → 2030年代）、縦軸に技術・事業スタック6層を取り、各時代で何が「基盤」を担っていたかを一枚に整理。右端の赤い列が将来像。最下段は各時代を次へ押し出した転換要因。</p>
+  </header>
+
+  <div class="legend">
+    <span><i style="background:var(--l-exp)"></i>体験・ゲームデザイン</span>
+    <span><i style="background:var(--l-sw)"></i>ソフトウェア／開発</span>
+    <span><i style="background:var(--l-hw)"></i>演算ハードウェア（基板）</span>
+    <span><i style="background:var(--l-io)"></i>入出力・筐体</span>
+    <span><i style="background:var(--l-net)"></i>ネットワーク・配信</span>
+    <span><i style="background:var(--l-biz)"></i>ビジネスモデル・場</span>
+    <span><i style="background:var(--future)"></i>将来（予測）</span>
+  </div>
+
+  <div class="board">
+    <div class="grid">
+      <!-- 時代ヘッダ -->
+      <div class="row">
+        <div class="cell era corner">層 ＼ 時代</div>
+        <div class="cell era"><div class="yr">1971–1977</div><div class="nm">① 発生期</div><div class="ex">Computer Space / Pong / Speed Race / Gun Fight</div></div>
+        <div class="cell era"><div class="yr">1978–1984</div><div class="nm">② 黄金期</div><div class="ex">スペースインベーダー / パックマン / ドンキーコング / ゼビウス</div></div>
+        <div class="cell era"><div class="yr">1985–1993</div><div class="nm">③ 標準化・体感期</div><div class="ex">ハングオン / アウトラン / ストリートファイターII / NEOGEO</div></div>
+        <div class="cell era"><div class="yr">1993–2003</div><div class="nm">④ 3D・音ゲー期</div><div class="ex">バーチャファイター / リッジレーサー / beatmania / DDR / プリクラ</div></div>
+        <div class="cell era"><div class="yr">2002–2014</div><div class="nm">⑤ ネットワーク・PC化期</div><div class="ex">WCCF / 三国志大戦 / ムシキング / NESiCAxLive</div></div>
+        <div class="cell era"><div class="yr">2015–2026</div><div class="nm">⑥ 体験・プライズ・キャッシュレス期</div><div class="ex">maimai / VR ZONE / オンラインクレーン / 大型体験施設</div></div>
+        <div class="cell era fut fut-h"><div class="yr">2027–2035+（予測）</div><div class="nm">⑦ 将来：クラウド×AI×リアル体験</div><div class="ex">「家では作れない体験」を提供するエッジ拠点</div></div>
+      </div>
+
+      <!-- 体験 -->
+      <div class="row r-exp">
+        <div class="cell lbl">体験<small>ゲームデザイン</small></div>
+        <div class="cell"><ul><li>単純な反射・対戦（テニス、レース、ガンマン）</li><li>「動く絵を操作できる」こと自体が価値</li></ul></div>
+        <div class="cell"><ul><li>スコアアタック・ハイスコア文化</li><li>キャラクター性、ステージ制、ストーリーの萌芽</li></ul></div>
+        <div class="cell"><ul><li><b>対人対戦</b>（格闘ゲーム）の爆発</li><li>体感ゲーム（バイク・操縦）</li><li>シューティング・ベルトスクロール成熟</li></ul></div>
+        <div class="cell"><ul><li>リアルタイム3D表現</li><li><b>音楽・身体</b>ゲーム、写真シール</li><li>非ゲーマー層・女性層の取り込み</li></ul></div>
+        <div class="cell"><ul><li>カード収集×戦略、継続育成</li><li>全国対戦・ランキング・段位</li><li>キッズ向けカードゲーム</li></ul></div>
+        <div class="cell"><ul><li>リズムゲーム・プライズ（クレーン）中心</li><li>VR／大型アトラクション、コラボ・推し活</li><li>e-sports・配信される遊び</li></ul></div>
+        <div class="cell fut"><ul><li><b>AIが個人ごとに難易度・展開を生成</b></li><li>XR＋ハプティクス＋全身センシングの没入体験</li><li>店舗・家・スマホを跨ぐ<b>連続した体験</b>（同一ID）</li><li>観戦・応援・交流を含めた「場」の体験</li></ul></div>
+      </div>
+
+      <!-- ソフト -->
+      <div class="row r-sw">
+        <div class="cell lbl">ソフトウェア<small>開発・制御</small></div>
+        <div class="cell"><ul><li>ソフト無し：<b>TTLディスクリート回路</b>でゲームロジックを配線</li><li>1975〜 マイコン制御が登場（Gun Fight）</li></ul></div>
+        <div class="cell"><ul><li>アセンブラによる手書き最適化</li><li>ROM焼き込み、数KB〜数十KB</li><li>少人数・短期開発</li></ul></div>
+        <div class="cell"><ul><li>スプライト／BG処理の専用ハード前提</li><li>複数CPU連携、サウンドドライバ</li><li>C言語の部分導入</li></ul></div>
+        <div class="cell"><ul><li>3Dポリゴン・テクスチャ・モーションキャプチャ</li><li>C/C++主体、チーム大型化</li><li>家庭用移植前提の設計</li></ul></div>
+        <div class="cell"><ul><li><b>Windows/Linux組込み OS</b> 上のアプリ化</li><li>DirectX/OpenGL、サーバ連携ロジック</li><li>オンラインアップデート前提</li></ul></div>
+        <div class="cell"><ul><li>Unity/Unreal 等の汎用エンジン</li><li>運営型（ライブオペレーション）、イベント配信</li><li>遠隔操作・映像配信アプリ</li></ul></div>
+        <div class="cell fut"><ul><li><b>生成AI</b>（NPC・ステージ・音楽・実況の生成）</li><li>店舗端末はクラウド描画の<b>薄いクライアント</b>化も</li><li>デジタルツインで筐体・店舗をシミュレーション</li></ul></div>
+      </div>
+
+      <!-- ハード -->
+      <div class="row r-hw">
+        <div class="cell lbl">演算ハード<small>基板・半導体</small></div>
+        <div class="cell"><ul><li>ディスクリートTTL基板（ゲーム専用配線）</li><li>Intel 8080 の採用開始</li></ul></div>
+        <div class="cell"><ul><li><b>8bit CPU</b>（8080・Z80・6502）</li><li>専用ビデオ回路、カラー化</li><li>コピー基板問題</li></ul></div>
+        <div class="cell"><ul><li><b>16bit</b>（68000）＋専用スプライトチップ</li><li>CPシステム、NEOGEO MVS などの<b>システム基板</b>（ROM差替）</li></ul></div>
+        <div class="cell"><ul><li>3D専用基板（Model 1/2/3、System 22 等）</li><li>家庭機互換基板（NAOMI 等）でコスト低減</li></ul></div>
+        <div class="cell"><ul><li><b>PCアーキテクチャ</b>（x86＋汎用GPU）</li><li>Type X、Lindbergh、RingEdge 等</li><li>HDD/SSD ストレージ</li></ul></div>
+        <div class="cell"><ul><li>汎用PC/ゲーミングGPU、組込みSoC</li><li>VR用高性能PC、カメラ・センサ処理</li></ul></div>
+        <div class="cell fut"><ul><li><b>エッジAI SoC</b>（NPU）で現地推論</li><li>重い描画・AIはクラウド/GPUサーバへオフロード</li><li>省電力・長寿命・リサイクル設計</li></ul></div>
+      </div>
+
+      <!-- I/O -->
+      <div class="row r-io">
+        <div class="cell lbl">入出力・筐体<small>I/O・UX</small></div>
+        <div class="cell"><ul><li>白黒CRT、ノブ、ハンドル</li><li>コインメック（機械式）</li></ul></div>
+        <div class="cell"><ul><li>カラーCRT、レバー＋ボタン</li><li>テーブル筐体（喫茶店）</li><li>トラックボール、ベクタースキャン</li></ul></div>
+        <div class="cell"><ul><li><b>JAMMA規格</b>（1985）で筐体と基板を分離・汎用化</li><li>汎用ビデオ筐体／対戦台</li><li>可動式体感筐体</li></ul></div>
+        <div class="cell"><ul><li>ターンテーブル・ダンスマット・太鼓など<b>専用コントローラ</b></li><li>ガンコン、カメラ＋プリンタ</li></ul></div>
+        <div class="cell"><ul><li>カードリーダ（磁気／IC）・プリンタ内蔵</li><li><b>ICカード会員証</b>（e-AMUSEMENT、Aime 等）</li><li>LCD化、タッチパネル</li></ul></div>
+        <div class="cell"><ul><li>大型LCD、VR HMD、モーション筐体</li><li>電子マネー・QR決済リーダ</li><li>クレーン・プライズ機の高度化</li></ul></div>
+        <div class="cell fut"><ul><li>XR グラス、触覚・風・温度の多感覚出力</li><li>カメラ／ミリ波での<b>非接触・全身入力</b>、生体（心拍等）</li><li>筐体の<b>IoTセンサ化と予知保全</b></li><li>モジュール型筐体（コンテンツ差し替え）</li></ul></div>
+      </div>
+
+      <!-- Net -->
+      <div class="row r-net">
+        <div class="cell lbl">ネットワーク<small>配信・連携</small></div>
+        <div class="cell"><ul><li>なし（完全スタンドアロン）</li></ul></div>
+        <div class="cell"><ul><li>なし。ソフト流通は<b>基板そのもの</b>の売買</li></ul></div>
+        <div class="cell"><ul><li>筐体内リンク対戦（通信対戦台）</li><li>ROMカートリッジ／ROM基板の流通</li></ul></div>
+        <div class="cell"><ul><li>店内LAN 多人数対戦</li><li>GD-ROM 等メディアでの配布</li></ul></div>
+        <div class="cell"><ul><li><b>店舗⇔メーカーサーバの常時接続</b>（e-AMUSEMENT、ALL.Net）</li><li>全国対戦、プレイデータ保存</li><li><b>ゲームのダウンロード配信</b>（NESiCAxLive）</li></ul></div>
+        <div class="cell"><ul><li>スマホアプリ・Web連携、SNS共有</li><li>インターネット経由の遠隔プレイ（オンクレ）</li><li>クラウドでの稼働・売上管理</li></ul></div>
+        <div class="cell fut"><ul><li><b>5G/6G＋エッジコンピューティング</b></li><li>統合ID（店舗・家庭・モバイル・ファン活動）</li><li>リアルタイム遠隔運用、OTA更新、稼働データ活用</li><li>店舗間・都市間の同期イベント</li></ul></div>
+      </div>
+
+      <!-- Biz -->
+      <div class="row r-biz">
+        <div class="cell lbl">ビジネス<small>収益・場</small></div>
+        <div class="cell"><ul><li>バー・ボウリング場に1台設置</li><li>コイン1プレイ課金</li></ul></div>
+        <div class="cell"><ul><li><b>インベーダーハウス</b>、ゲームセンター業態の確立</li><li>喫茶店テーブル筐体</li></ul></div>
+        <div class="cell"><ul><li>基板・キット販売モデル</li><li>大型店・アミューズメント施設化</li><li>家庭用ゲーム機との競合開始</li></ul></div>
+        <div class="cell"><ul><li>大型複合施設、テーマパーク型</li><li>プリクラ・メダルゲームで客層拡大</li></ul></div>
+        <div class="cell"><ul><li><b>カード販売＋プレイ料金</b>の複合収益</li><li>メーカーとオペレーターの<b>レベニューシェア</b>（ネット課金）</li></ul></div>
+        <div class="cell"><ul><li>プライズ（景品）比率の上昇</li><li>キャッシュレス、IP・推し活コラボ</li><li>店舗運営会社の再編</li></ul></div>
+        <div class="cell fut"><ul><li><b>サブスク・時間制・ダイナミックプライシング</b></li><li>データ駆動の店舗運営（配置・景品・保守のAI最適化）</li><li>体験施設・観光・地域コミュニティ拠点化</li><li>ライブ配信・e-sports での二次収益</li></ul></div>
+      </div>
+
+      <!-- 転換要因 -->
+      <div class="row">
+        <div class="cell lbl shift">次の時代への<br>転換要因</div>
+        <div class="cell shift"><strong>マイコンの低価格化</strong>で回路設計からソフト開発へ</div>
+        <div class="cell shift"><strong>ブーム後の飽和</strong>（米国市場の崩壊）とコピー基板対策 → 標準化の必要</div>
+        <div class="cell shift"><strong>家庭用機の高性能化</strong>で「家ではできない」3D・専用体験が必要に</div>
+        <div class="cell shift"><strong>基板コスト高騰</strong>と家庭用ネット対戦の台頭 → PC化・オンライン化</div>
+        <div class="cell shift"><strong>スマホゲームの普及</strong>で遊び時間を奪われ、体験・景品へシフト</div>
+        <div class="cell shift"><strong>人手不足・コスト高・キャッシュレス化</strong>、生成AIとXRの成熟</div>
+        <div class="cell shift fut">「リアルな場で、身体と他者を伴う体験」へ価値が集約</div>
+      </div>
+    </div>
+  </div>
+  <p class="hint">← 表は横にスクロールできます →</p>
+
+  <div class="bottom">
+    <div class="card">
+      <h2>50年を貫く3つの不変の構造</h2>
+      <ul>
+        <li><b>家庭では得られない体験</b>：専用I/O・大画面・体感・対人の熱気が存在理由。家庭用が追いつくたびに次の差別化へ移る。</li>
+        <li><b>短時間・従量課金</b>：1プレイ課金 → カード／電子マネー → 時間制・サブスクへと形を変えながら継続。</li>
+        <li><b>汎用化と専用化の振り子</b>：TTL専用 → CPU汎用 → 3D専用基板 → PC汎用 → AI/XR専用I/O。</li>
+      </ul>
+    </div>
+    <div class="card f">
+      <h2>将来のリファレンス・アーキテクチャ（予測）</h2>
+      <div class="stack">
+        <div class="s1"><b>体験層</b>：XR・体感筐体・プライズ・観戦／交流スペース</div>
+        <div class="s2"><b>エッジ層（店舗）</b>：NPU搭載筐体、センサ、決済・ID端末、ローカル推論</div>
+        <div class="s3"><b>ネットワーク層</b>：5G/6G・光回線、エッジサーバ、OTA配信</div>
+        <div class="s4"><b>クラウドAI層</b>：生成AIコンテンツ、パーソナライズ、マッチング、不正検知</div>
+        <div class="s5"><b>データ・事業層</b>：統合ID、売上・稼働分析、予知保全、動的価格、IP連携</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>将来に向けた主な論点</h2>
+      <ul>
+        <li>筐体の長寿命化と<b>リモート保守</b>（稼働停止＝売上損失）</li>
+        <li>個人データ・生体データの<b>プライバシー</b>と景品規制への対応</li>
+        <li>クラウド依存時の<b>レイテンシ</b>と回線障害時のフォールバック</li>
+        <li>メーカー・オペレーター・IPホルダー間の<b>収益配分</b>設計</li>
+        <li>少子化・人手不足に対する<b>無人化・省人化運営</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>年代区分は主要な技術・事業の転換点に基づく概略です。各時代の作品・システムは代表例であり、⑦は現在の動向からの予測です。</footer>
+</div>
+</body>
+</html>
