@@ -21,6 +21,7 @@
     --e6: #B9531D;
     --e7: #C2334A;
     --icon-bg: #FBFAF7;
+    --hl: #E0262B;
     --shadow: 0 1px 2px rgba(20,30,40,0.06), 0 8px 20px rgba(20,30,40,0.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -30,7 +31,7 @@
       --border: #2C333C; --line: #48525C;
       --e1: #A3AAB5; --e2: #6FC497; --e3: #7FA8D9; --e4: #B39DE0;
       --e5: #5FC3CC; --e6: #E89A62; --e7: #F27C8F;
-      --icon-bg: #20262E; --shadow: none;
+      --icon-bg: #20262E; --shadow: none; --hl: #FF5A5F;
     }
   }
   :root[data-theme="dark"] {
@@ -39,7 +40,7 @@
     --border: #2C333C; --line: #48525C;
     --e1: #A3AAB5; --e2: #6FC497; --e3: #7FA8D9; --e4: #B39DE0;
     --e5: #5FC3CC; --e6: #E89A62; --e7: #F27C8F;
-    --icon-bg: #20262E; --shadow: none;
+    --icon-bg: #20262E; --shadow: none; --hl: #FF5A5F;
   }
   * { box-sizing: border-box; }
   body {
@@ -54,8 +55,15 @@
   header p { margin: 0 auto; max-width: 720px; color: var(--text-muted); font-size: 14px; }
 
   /* ---- 横スクロール枠（時代列と一覧列を同じグリッドで揃える） ---- */
-  .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
-  .inner { min-width: 1240px; }
+  .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 12px 0 14px; }
+  .inner { min-width: 1240px; position: relative; --w: calc((100% - 34px - 110px - 98px) / 7); }
+  /* 強調枠：2015–2026 列（6番目の時代）を上端から一覧の下端まで囲む */
+  .highlight {
+    position: absolute; top: -10px; bottom: -10px; pointer-events: none; z-index: 2;
+    left: calc(17px + 110px + 14px + 5 * (var(--w) + 14px) - 7px);
+    width: calc(var(--w) + 14px);
+    border: 3px solid var(--hl); border-radius: 18px;
+  }
   .cols { display: grid; grid-template-columns: 110px repeat(7, minmax(0, 1fr)); column-gap: 14px; }
 
   /* ---- タイムライン（横） ---- */
@@ -119,6 +127,7 @@
   </header>
 
   <div class="scroller"><div class="inner">
+  <div class="highlight" aria-hidden="true"></div>
   <div class="timeline cols">
     <div class="axis"><div>年代</div><div class="t">シンボル</div><div>時代の特徴</div></div>
     <!-- ① -->
