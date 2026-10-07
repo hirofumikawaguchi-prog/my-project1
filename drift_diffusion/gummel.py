@@ -95,25 +95,38 @@ def solve_bias_point(x, C, eps, V_left, V_right, psi_init, n_init, p_init,
     return psi, n, p, iterations
 
 
+MAX_BIAS_STEP = 0.1  # volts; largest continuation step between solves
+
+
 def bias_sweep(x, C, eps, voltages, ni=NI, Vt=V_T, D_n=D_N, D_p=D_P,
                tau_n=TAU_N, tau_p=TAU_P, recombination=True,
-               max_iter=500, tol=1e-9):
+               max_iter=500, tol=1e-9, max_step=MAX_BIAS_STEP):
     """Solve a sequence of bias points, using continuation (each solution
     seeds the initial guess for the next voltage) for robust convergence.
+
+    Jumps larger than `max_step` between consecutive voltages are split
+    into intermediate (unreported) solves: a single Gummel step across
+    e.g. -0.5 V -> +0.5 V is ill-conditioned enough that the continuity
+    solves can return negative densities and diverge to NaN, depending
+    on the BLAS kernel the host CPU selects.
 
     Returns a list of dicts, one per voltage, each with keys
     'V', 'psi', 'n', 'p', 'J', 'iterations'.
     """
     psi, n, p = equilibrium_initial_guess(x, C, ni, Vt)
+    V_prev = 0.0
     results = []
     for V in voltages:
-        psi, n, p, iters = solve_bias_point(
-            x, C, eps, V_left=V, V_right=0.0,
-            psi_init=psi, n_init=n, p_init=p,
-            ni=ni, Vt=Vt, D_n=D_n, D_p=D_p,
-            tau_n=tau_n, tau_p=tau_p, recombination=recombination,
-            max_iter=max_iter, tol=tol,
-        )
+        n_steps = max(1, int(np.ceil(abs(V - V_prev) / max_step)))
+        for V_step in np.linspace(V_prev, V, n_steps + 1)[1:]:
+            psi, n, p, iters = solve_bias_point(
+                x, C, eps, V_left=V_step, V_right=0.0,
+                psi_init=psi, n_init=n, p_init=p,
+                ni=ni, Vt=Vt, D_n=D_n, D_p=D_p,
+                tau_n=tau_n, tau_p=tau_p, recombination=recombination,
+                max_iter=max_iter, tol=tol,
+            )
+        V_prev = V
         J = current_density(x, psi, n, p, D_n=D_n, D_p=D_p, Vt=Vt)
         results.append({
             "V": V,
