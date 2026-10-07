@@ -53,16 +53,24 @@
   header h1 { font-size: clamp(22px, 3.2vw, 34px); margin: 6px 0 8px; letter-spacing: .03em; }
   header p { margin: 0 auto; max-width: 720px; color: var(--text-muted); font-size: 14px; }
 
+  /* ---- 横スクロール枠（時代列と一覧列を同じグリッドで揃える） ---- */
+  .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+  .inner { min-width: 1240px; }
+  .cols { display: grid; grid-template-columns: 110px repeat(7, minmax(0, 1fr)); column-gap: 14px; }
+
   /* ---- タイムライン（横） ---- */
-  .timeline { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 14px; }
-  .timeline::before {
-    content: ""; position: absolute; left: 4%; right: 17%; top: 110px; height: 4px; border-radius: 2px;
-    background: linear-gradient(90deg, var(--e1), var(--e2), var(--e3), var(--e4), var(--e5), var(--e6));
+  .timeline { padding: 0 17px; }
+  .axis { display: flex; flex-direction: column; justify-content: flex-start; font-size: 12px; color: var(--text-faint); font-weight: 650; }
+  .axis > div:first-child { height: 44px; display: flex; align-items: center; }
+  .axis > div:last-child { margin-top: 16px; padding-top: 16px; }
+  .axis .t { height: 128px; display: flex; align-items: center; color: var(--text-muted); }
+  .era::before {
+    content: ""; position: absolute; top: 106px; left: -7px; right: -7px; height: 4px; background: var(--c);
   }
-  .timeline::after {
-    content: ""; position: absolute; left: 83%; right: 0; top: 110px; height: 4px;
-    background: repeating-linear-gradient(90deg, var(--e7) 0 10px, transparent 10px 18px);
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  .axis + .era::before { left: 50%; }
+  .era.future::before {
+    right: -17px; background: repeating-linear-gradient(90deg, var(--c) 0 10px, transparent 10px 18px);
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); height: 10px; top: 103px;
   }
   .era { --c: var(--e1); display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
   .era .yr { font-size: 13px; font-weight: 700; color: var(--c); font-variant-numeric: tabular-nums; letter-spacing: .03em; height: 26px; }
@@ -87,8 +95,8 @@
   .era.future .card { border-style: dashed; border-top-style: solid; }
 
   /* ---- 進化帯 ---- */
-  .bands { margin-top: 28px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
-  .band { display: grid; grid-template-columns: 110px repeat(7, minmax(0, 1fr)); align-items: center; gap: 14px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+  .bands { margin-top: 24px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .band { align-items: center; row-gap: 0; padding: 7px 0; border-bottom: 1px dashed var(--border); }
   .band:last-child { border-bottom: none; }
   .band b { font-size: 12px; color: var(--text-muted); font-weight: 650; }
   .band span { font-size: 12px; text-align: center; padding: 4px 6px; border-radius: 6px; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--text); position: relative; }
@@ -98,22 +106,8 @@
   .msg strong { color: var(--text); }
   footer { margin-top: 16px; text-align: center; font-size: 11px; color: var(--text-faint); }
 
-  /* ---- 縦レイアウト（狭い画面） ---- */
-  @media (max-width: 1100px) {
-    .timeline { grid-template-columns: 1fr; gap: 18px; padding-left: 0; }
-    .timeline::before { left: 47px; right: auto; top: 20px; bottom: 120px; width: 4px; height: auto;
-      background: linear-gradient(180deg, var(--e1), var(--e2), var(--e3), var(--e4), var(--e5), var(--e6)); }
-    .timeline::after { left: 47px; right: auto; top: auto; bottom: 0; height: 120px; width: 4px;
-      background: repeating-linear-gradient(180deg, var(--e7) 0 10px, transparent 10px 18px); clip-path: none; }
-    .era { display: grid; grid-template-columns: 98px 1fr; grid-template-rows: auto auto 1fr; column-gap: 14px; text-align: left; align-items: start; }
-    .era .icon { grid-column: 1; grid-row: 1 / span 3; width: 98px; height: 98px; }
-    .era .icon svg { width: 58px; height: 58px; }
-    .era .yr, .era .no { grid-column: 2; height: auto; }
-    .era .card { grid-column: 2; margin-top: 4px; }
-    .tags { justify-content: flex-start; }
-    .bands { overflow-x: auto; }
-    .band { min-width: 900px; }
-  }
+  .hint { font-size: 11px; color: var(--text-faint); text-align: right; margin: 4px 0 0; }
+  @media (min-width: 1290px) { .hint { display: none; } }
 </style>
 </head>
 <body>
@@ -124,7 +118,9 @@
     <p>各時代を象徴する1つのシンボルで、白黒の「ピンポン」から AI×XR の体験拠点までをたどる。</p>
   </header>
 
-  <div class="timeline">
+  <div class="scroller"><div class="inner">
+  <div class="timeline cols">
+    <div class="axis"><div>年代</div><div class="t">シンボル</div><div>時代の特徴</div></div>
     <!-- ① -->
     <div class="era" style="--c: var(--e1)">
       <div class="yr">1971–1977</div><div class="no">ERA 1</div>
@@ -267,19 +263,22 @@
   </div>
 
   <div class="bands">
-    <div class="band">
+    <div class="band cols">
       <b>演算ハード</b>
       <span style="--c:var(--e1)">TTL回路</span><span style="--c:var(--e2)">8bit CPU</span><span style="--c:var(--e3)">16bit＋専用チップ</span><span style="--c:var(--e4)">3D専用基板</span><span style="--c:var(--e5)">PC（x86＋GPU）</span><span style="--c:var(--e6)">汎用GPU・SoC</span><span style="--c:var(--e7)">エッジAI＋クラウド</span>
     </div>
-    <div class="band">
+    <div class="band cols">
       <b>つながり</b>
       <span style="--c:var(--e1)">単体</span><span style="--c:var(--e2)">単体</span><span style="--c:var(--e3)">筐体リンク</span><span style="--c:var(--e4)">店内LAN</span><span style="--c:var(--e5)">全国オンライン</span><span style="--c:var(--e6)">スマホ・遠隔</span><span style="--c:var(--e7)">5G/6G・統合ID</span>
     </div>
-    <div class="band">
+    <div class="band cols">
       <b>お金の取り方</b>
       <span style="--c:var(--e1)">1プレイ課金</span><span style="--c:var(--e2)">1プレイ課金</span><span style="--c:var(--e3)">基板・キット販売</span><span style="--c:var(--e4)">メダル・プリクラ</span><span style="--c:var(--e5)">カード＋課金分配</span><span style="--c:var(--e6)">プライズ・電子決済</span><span style="--c:var(--e7)">サブスク・変動価格</span>
     </div>
   </div>
+
+  </div></div>
+  <p class="hint">← 横にスクロールできます →</p>
 
   <p class="msg">変わらない価値は <strong>「家では得られない体験」</strong>。家庭用が追いつくたびに、アーケードは次の体験へ進化してきた。</p>
   <footer>年代区分・代表例は概略です。2027年以降は現在の動向からの予測です。</footer>
