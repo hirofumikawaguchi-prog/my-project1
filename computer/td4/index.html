@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TD4 回路シミュレーター</title>
+<style>
+  :root {
+    --bg: #F2F4F5;
+    --bg-panel: #FFFFFF;
+    --bg-sunk: #EEF1F3;
+    --text: #1B2430;
+    --text-muted: #5B6672;
+    --text-faint: #8590A0;
+    --border: #C9D2D8;
+    --wire: #A7B2BC;
+    --wire-on: #D9480F;
+    --ctrl: #8B95A1;
+    --ctrl-on: #2C5282;
+    --accent: #2C5282;
+    --accent-soft: #DCE6F2;
+    --led-off: #4A1F1F;
+    --led-on: #FF3B30;
+    --ok: #2F7D52;
+    --err: #B23A3A;
+    --row-hl: #FFF1C2;
+    --shadow: 0 1px 2px rgba(20,30,40,0.06), 0 6px 16px rgba(20,30,40,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181D; --bg-panel: #1A2027; --bg-sunk: #20272F;
+      --text: #E7ECEF; --text-muted: #A3AEB8; --text-faint: #7A8590;
+      --border: #2B333B; --wire: #46525D; --wire-on: #FF8A4C;
+      --ctrl: #5A6670; --ctrl-on: #7FA8D9;
+      --accent: #7FA8D9; --accent-soft: #1E2C3D;
+      --led-off: #3A1C1C; --led-on: #FF5A4F;
+      --ok: #6FC497; --err: #F08080; --row-hl: #3A3320; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181D; --bg-panel: #1A2027; --bg-sunk: #20272F;
+    --text: #E7ECEF; --text-muted: #A3AEB8; --text-faint: #7A8590;
+    --border: #2B333B; --wire: #46525D; --wire-on: #FF8A4C;
+    --ctrl: #5A6670; --ctrl-on: #7FA8D9;
+    --accent: #7FA8D9; --accent-soft: #1E2C3D;
+    --led-off: #3A1C1C; --led-on: #FF5A4F;
+    --ok: #6FC497; --err: #F08080; --row-hl: #3A3320; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.55;
+  }
+  .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  .page { max-width: 1400px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { font-size: 22px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--text-muted); max-width: 920px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; margin-top: 18px; }
+  .lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+  @media (max-width: 1000px) { .layout, .lower { grid-template-columns: 1fr; } }
+  .panel { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px; }
+  .panel h2 small { font-weight: 400; color: var(--text-faint); font-size: 11.5px; }
+
+  /* 回路図 */
+  .diagram-wrap { overflow-x: auto; }
+  svg#diagram { width: 100%; min-width: 720px; height: auto; display: block; }
+  .blk rect { fill: var(--bg-sunk); stroke: var(--border); stroke-width: 1.5; rx: 10; }
+  .blk.active rect { stroke: var(--accent); stroke-width: 2.5; }
+  .blk .t { font-size: 13px; font-weight: 700; fill: var(--text); }
+  .blk .s { font-size: 11px; fill: var(--text-muted); }
+  .blk .v { font-size: 17px; font-weight: 700; fill: var(--text); }
+  .wire { fill: none; stroke: var(--wire); stroke-width: 3; stroke-linejoin: round; }
+  .wire.on { stroke: var(--wire-on); }
+  .ctrl { fill: none; stroke: var(--ctrl); stroke-width: 1.8; stroke-dasharray: 5 4; }
+  .ctrl.on { stroke: var(--ctrl-on); stroke-width: 2.4; }
+  .wv { font-size: 12px; fill: var(--text-muted); font-weight: 600; }
+  .wl { font-size: 10.5px; fill: var(--text-faint); }
+  .lamp { fill: var(--bg-panel); stroke: var(--ctrl); stroke-width: 1.5; }
+  .lamp.on { fill: var(--ctrl-on); stroke: var(--ctrl-on); }
+  .led { fill: var(--led-off); stroke: var(--border); }
+  .led.on { fill: var(--led-on); filter: drop-shadow(0 0 4px var(--led-on)); }
+
+  /* 操作 */
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, select {
+    font: inherit; font-size: 13px; color: var(--text); background: var(--bg-sunk);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg-panel); font-weight: 650; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .lbl { font-size: 12px; color: var(--text-muted); min-width: 64px; }
+  .sw { width: 40px; padding: 6px 0; text-align: center; font-weight: 700; }
+  .sw.on { background: var(--accent); color: var(--bg-panel); border-color: var(--accent); }
+  .leds { display: flex; gap: 10px; }
+  .leds span { width: 30px; height: 30px; border-radius: 50%; background: var(--led-off); border: 1px solid var(--border); display: grid; place-items: center; font-size: 10px; color: var(--text-faint); }
+  .leds span.on { background: var(--led-on); box-shadow: 0 0 12px var(--led-on); color: #fff; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 11.5px; }
+  .regs td.v { font-weight: 700; }
+  .sig { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; }
+  .sig span { display: flex; align-items: center; gap: 6px; }
+  .sig i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ctrl); display: inline-block; }
+  .sig i.on { background: var(--ctrl-on); border-color: var(--ctrl-on); }
+  .next { margin-top: 10px; padding: 8px 10px; background: var(--accent-soft); border-radius: 8px; font-size: 12.5px; }
+
+  /* ROM */
+  .rom td { padding: 2px 4px; }
+  .rom tr.pc td { background: var(--row-hl); }
+  .bit { width: 22px; height: 22px; padding: 0; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .bit.on { background: var(--accent); border-color: var(--accent); color: var(--bg-panel); }
+  .bit.gap { margin-left: 8px; }
+  .asm-col { color: var(--text-muted); white-space: nowrap; }
+  textarea { width: 100%; min-height: 300px; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--text); background: var(--bg-sunk); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; resize: vertical; }
+  .msg { font-size: 12px; margin-top: 6px; min-height: 18px; }
+  .msg.err { color: var(--err); }
+  .msg.ok { color: var(--ok); }
+  .note { font-size: 12px; color: var(--text-muted); }
+  footer { margin-top: 16px; font-size: 11.5px; color: var(--text-faint); }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>TD4 4ビットCPU 回路シミュレーター</h1>
+    <p>書籍『CPUの創りかた』で知られる4ビットCPU「TD4」を、NOT・AND・OR・XORゲートとDフリップフロップだけで組み立て、ゲート単位でシミュレーションします。クロックを1つずつ進めて、命令が回路をどう流れるかを確認できます。</p>
+  </header>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>回路図 <small>オレンジ＝値が0以外のバス／青の点線＝有効な制御信号</small></h2>
+      <div class="diagram-wrap">
+      <svg id="diagram" viewBox="0 0 960 560" role="img" aria-label="TD4のブロック回路図">
+        <!-- バス（データ） -->
+        <path id="w-addr" class="wire" d="M110 250 V180"/>
+        <path id="w-op" class="wire" d="M180 95 H280"/>
+        <path id="w-im" class="wire" d="M180 168 H480 V330 H520"/>
+        <path id="w-selout" class="wire" d="M440 305 H520"/>
+        <path id="w-sum" class="wire" d="M660 305 H720 M720 90 V500 M720 90 H760 M720 190 H760 M720 290 H760 M720 500 H200 V285 H180"/>
+        <path id="w-a" class="wire" d="M910 90 H940 V535 H320 V360"/>
+        <path id="w-b" class="wire" d="M910 190 H925 V520 H340 V360"/>
+        <path id="w-in" class="wire" d="M180 430 H250 V330 H280"/>
+        <path id="w-out" class="wire" d="M835 320 V336"/>
+        <!-- 制御信号 -->
+        <path id="c-sel" class="ctrl" d="M360 150 V250"/>
+        <path id="c-load" class="ctrl" d="M440 70 H835 V60"/>
+        <path id="c-pc" class="ctrl" d="M440 120 H470 V230 H150 V250"/>
+        <path id="c-carry" class="ctrl" d="M590 360 V420"/>
+        <path id="c-c2dec" class="ctrl" d="M660 450 H690 V20 H360 V40"/>
+
+        <!-- バスの値 -->
+        <text class="wl" x="118" y="208">アドレス</text><text id="v-addr" class="wv mono" x="118" y="224"></text>
+        <text class="wl" x="190" y="86">命令(上位4bit)</text><text id="v-op" class="wv mono" x="230" y="112"></text>
+        <text class="wl" x="190" y="162">Im(下位4bit)</text><text id="v-im" class="wv mono" x="286" y="162"></text>
+        <text class="wl" x="368" y="196">SELECT</text><text id="v-sel" class="wv mono" x="368" y="212"></text>
+        <text class="wl" x="560" y="62">LOAD</text>
+        <text class="wl" x="186" y="224">LOAD PC</text>
+        <text id="v-selout" class="wv mono" x="452" y="298"></text>
+        <text class="wl" x="598" y="388">桁上がり</text><text id="v-carry" class="wv mono" x="598" y="404"></text>
+        <text class="wl" x="666" y="296">結果</text><text id="v-sum" class="wv mono" x="664" y="326"></text>
+        <text class="wl" x="700" y="16">C → JNC判定</text>
+        <text class="wl" x="740" y="548">A</text><text id="v-a" class="wv mono" x="752" y="548"></text>
+        <text class="wl" x="740" y="514">B</text><text id="v-b" class="wv mono" x="752" y="514"></text>
+        <text id="v-in" class="wv mono" x="190" y="422"></text>
+
+        <!-- ブロック -->
+        <g id="b-rom" class="blk"><rect x="40" y="40" width="140" height="140"/>
+          <text class="t" x="52" y="62">ROM</text><text class="s" x="52" y="80">16語×8bit（DIPスイッチ）</text>
+          <text class="s" x="52" y="118">PCが指す命令</text><text id="t-rom" class="v mono" x="52" y="142"></text>
+          <text id="t-mn" class="s mono" x="52" y="164"></text></g>
+        <g id="b-pc" class="blk"><rect x="40" y="250" width="140" height="70"/>
+          <text class="t" x="52" y="272">PC</text><text class="s" x="80" y="272">プログラムカウンタ</text>
+          <text id="t-pc" class="v mono" x="52" y="300"></text><text id="t-pcnext" class="s" x="112" y="300"></text></g>
+        <g id="b-in" class="blk"><rect x="40" y="400" width="140" height="60"/>
+          <text class="t" x="52" y="422">入力 IN</text><text id="t-in" class="v mono" x="52" y="448"></text></g>
+        <g id="b-dec" class="blk"><rect x="280" y="40" width="160" height="110"/>
+          <text class="t" x="292" y="62">命令デコーダ</text><text class="s" x="292" y="80">命令→制御信号</text>
+          <text id="t-dec" class="v mono" x="292" y="112"></text><text id="t-dec2" class="s" x="292" y="136"></text></g>
+        <g id="b-sel" class="blk"><rect x="280" y="250" width="160" height="110"/>
+          <text class="t" x="292" y="272">データセレクタ</text><text class="s" x="292" y="290">A / B / IN / 0 から1つ</text>
+          <text id="t-sel" class="v mono" x="292" y="322"></text><text class="s" x="292" y="346">（0 は常に0000）</text></g>
+        <g id="b-alu" class="blk"><rect x="520" y="250" width="140" height="110"/>
+          <text class="t" x="532" y="272">加算器 ALU</text><text class="s" x="532" y="290">選択値 + Im</text>
+          <text id="t-alu" class="v mono" x="532" y="322"></text><text id="t-alu2" class="s mono" x="532" y="346"></text></g>
+        <g id="b-c" class="blk"><rect x="520" y="420" width="140" height="60"/>
+          <text class="t" x="532" y="442">C フラグ</text><text class="s" x="532" y="470">毎クロック更新</text><text id="t-c" class="v mono" x="626" y="462"></text></g>
+        <g id="b-a" class="blk"><rect x="760" y="60" width="150" height="60"/>
+          <text class="t" x="772" y="82">レジスタ A</text><text id="t-a" class="v mono" x="772" y="108"></text><circle id="l-a" class="lamp" cx="894" cy="76" r="6"/></g>
+        <g id="b-b" class="blk"><rect x="760" y="160" width="150" height="60"/>
+          <text class="t" x="772" y="182">レジスタ B</text><text id="t-b" class="v mono" x="772" y="208"></text><circle id="l-b" class="lamp" cx="894" cy="176" r="6"/></g>
+        <g id="b-out" class="blk"><rect x="760" y="260" width="150" height="60"/>
+          <text class="t" x="772" y="282">出力 OUT</text><text id="t-out" class="v mono" x="772" y="308"></text><circle id="l-out" class="lamp" cx="894" cy="276" r="6"/></g>
+        <g id="leds">
+          <circle class="led" cx="790" cy="350" r="11"/><circle class="led" cx="820" cy="350" r="11"/>
+          <circle class="led" cx="850" cy="350" r="11"/><circle class="led" cx="880" cy="350" r="11"/>
+        </g>
+        <text class="wl" x="760" y="380">LED（bit3 … bit0）</text>
+        <text class="wl" x="44" y="548">● ランプ点灯＝次のクロックでそのレジスタに書き込む</text>
+      </svg>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>操作パネル</h2>
+      <div class="btns">
+        <button id="btn-reset">リセット</button>
+        <button id="btn-step" class="primary">1クロック進める</button>
+        <button id="btn-run">▶ 自動実行</button>
+        <select id="speed" aria-label="クロック速度">
+          <option value="1">1 Hz</option>
+          <option value="5" selected>5 Hz</option>
+          <option value="10">10 Hz</option>
+          <option value="50">50 Hz</option>
+        </select>
+      </div>
+      <div class="row"><span class="lbl">クロック数</span><span id="cycles" class="mono">0</span></div>
+      <div class="row"><span class="lbl">入力 IN</span><span id="in-sw" class="btns"></span></div>
+      <div class="row"><span class="lbl">出力 LED</span><span id="out-led" class="leds"></span></div>
+
+      <table class="regs" style="margin-top:12px">
+        <tr><th>レジスタ</th><th>2進</th><th>10進</th></tr>
+        <tr><td>A</td><td id="r-a" class="v mono"></td><td id="r-a10" class="mono"></td></tr>
+        <tr><td>B</td><td id="r-b" class="v mono"></td><td id="r-b10" class="mono"></td></tr>
+        <tr><td>OUT</td><td id="r-out" class="v mono"></td><td id="r-out10" class="mono"></td></tr>
+        <tr><td>PC</td><td id="r-pc" class="v mono"></td><td id="r-pc10" class="mono"></td></tr>
+        <tr><td>C</td><td id="r-c" class="v mono"></td><td></td></tr>
+      </table>
+
+      <h2 style="margin-top:14px">制御信号 <small>命令デコーダの出力</small></h2>
+      <div class="sig" id="sigs"></div>
+      <div class="next" id="next"></div>
+    </aside>
+  </div>
+
+  <div class="lower">
+    <section class="panel">
+      <h2>ROM（プログラム） <small>ビットをクリックするとDIPスイッチを切り替えます</small></h2>
+      <table class="rom" id="rom"></table>
+    </section>
+    <section class="panel">
+      <h2>アセンブラ <small>命令を書いて ROM に書き込みます（最大16命令）</small></h2>
+      <div class="row" style="margin-top:0">
+        <select id="sample" aria-label="サンプルプログラム"></select>
+        <button id="btn-asm" class="primary">ROMに書き込む</button>
+      </div>
+      <textarea id="src" spellcheck="false" style="margin-top:8px"></textarea>
+      <div id="asm-msg" class="msg"></div>
+      <p class="note">数値は 10進（5）、2進（0b0101）、16進（0x5）で書けます。「;」以降はコメントです。</p>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="panel">
+      <h2>命令一覧 <small>上位4bit＝命令、下位4bit＝Im（即値）</small></h2>
+      <table>
+        <tr><th>命令</th><th>機械語</th><th>動作</th></tr>
+        <tr><td class="mono">ADD A,Im</td><td class="mono">0000 Im</td><td>A ← A + Im（桁上がりは C へ）</td></tr>
+        <tr><td class="mono">ADD B,Im</td><td class="mono">0101 Im</td><td>B ← B + Im</td></tr>
+        <tr><td class="mono">MOV A,Im</td><td class="mono">0011 Im</td><td>A ← Im</td></tr>
+        <tr><td class="mono">MOV B,Im</td><td class="mono">0111 Im</td><td>B ← Im</td></tr>
+        <tr><td class="mono">MOV A,B</td><td class="mono">0001 0000</td><td>A ← B</td></tr>
+        <tr><td class="mono">MOV B,A</td><td class="mono">0100 0000</td><td>B ← A</td></tr>
+        <tr><td class="mono">IN A</td><td class="mono">0010 0000</td><td>A ← 入力</td></tr>
+        <tr><td class="mono">IN B</td><td class="mono">0110 0000</td><td>B ← 入力</td></tr>
+        <tr><td class="mono">OUT B</td><td class="mono">1001 0000</td><td>OUT ← B</td></tr>
+        <tr><td class="mono">OUT Im</td><td class="mono">1011 Im</td><td>OUT ← Im</td></tr>
+        <tr><td class="mono">JMP Im</td><td class="mono">1111 Im</td><td>PC ← Im</td></tr>
+        <tr><td class="mono">JNC Im</td><td class="mono">1110 Im</td><td>C = 0 のとき PC ← Im</td></tr>
+      </table>
+      <p class="note">C フラグは毎クロック、加算器の桁上がりで上書きされます。JNC は直前の命令の桁上がりを見ます。</p>
+    </section>
+    <section class="panel">
+      <h2>回路の規模 <small>このシミュレーターが実際に計算しているゲート数</small></h2>
+      <table id="stats"></table>
+      <p class="note">各ゲートは毎クロック、配線のつながり順（トポロジカル順）にすべて計算されます。レジスタは立ち上がりで値を取り込む D フリップフロップです。</p>
+    </section>
+  </div>
+
+  <footer>ゲート単位のシミュレーションです。電気的な遅延やチャタリングは扱いません。</footer>
+</div>
+
+<script id="td4-core">
+/* ===== TD4 ゲートレベル回路シミュレーター（コア） =====
+ * ブラウザでもNode（テスト）でも読み込めるよう、外部依存なしの素のJSで書く。 */
+var TD4 = (function () {
+  'use strict';
+
+  /* ---- 汎用ゲートシミュレーター ---- */
+  function Circuit() {
+    this.values = [];      // 各ネット（配線）の値 0/1
+    this.names = [];
+    this.driver = [];      // そのネットを駆動するゲート番号（-1 = 入力/FF出力）
+    this.gates = [];       // { type, ins, out }
+    this.ffs = [];         // D フリップフロップ { d, q }
+    this.inputs = {};
+    this.block = '';
+    this.stats = {};       // ブロック名 -> { ゲート種別 -> 個数 }
+    this.order = null;
+    this.ZERO = this.input('GND');
+    this.ONE = this.input('VCC');
+    this.values[this.ONE] = 1;
+  }
+  Circuit.prototype._net = function (name) {
+    this.values.push(0); this.names.push(name); this.driver.push(-1);
+    return this.values.length - 1;
+  };
+  Circuit.prototype._count = function (type) {
+    var b = this.stats[this.block] || (this.stats[this.block] = {});
+    b[type] = (b[type] || 0) + 1;
+  };
+  Circuit.prototype.input = function (name) {
+    var n = this._net(name); this.inputs[n] = true; return n;
+  };
+  Circuit.prototype.inputBus = function (name, width) {
+    var bus = [];
+    for (var i = 0; i < width; i++) bus.push(this.input(name + i));
+    return bus;
+  };
+  Circuit.prototype.gate = function (type, ins) {
+    for (var i = 0; i < ins.length; i++) {
+      if (!(ins[i] >= 0 && ins[i] < this.values.length)) throw new Error('未接続の入力があります: ' + type);
+    }
+    var out = this._net(type);
+    this.driver[out] = this.gates.length;
+    this.gates.push({ type: type, ins: ins.slice(), out: out });
+    this._count(type);
+    this.order = null;
+    return out;
+  };
+  Circuit.prototype.not = function (a) { return this.gate('NOT', [a]); };
+  Circuit.prototype.and = function () { return this.gate('AND', Array.prototype.slice.call(arguments)); };
+  Circuit.prototype.or = function () { return this.gate('OR', Array.prototype.slice.call(arguments)); };
+  Circuit.prototype.xor = function (a, b) { return this.gate('XOR', [a, b]); };
+  Circuit.prototype.dff = function (name) {
+    var ff = { d: -1, q: this._net(name) };
+    this.ffs.push(ff); this._count('DFF');
+    return ff;
+  };
+  // 組み合わせ回路を、入力から出力へ向かう順（トポロジカル順）に並べる。ループがあれば検出する。
+  Circuit.prototype._sort = function () {
+    var n = this.gates.length, indeg = new Array(n).fill(0), users = this.values.map(function () { return []; });
+    var self = this;
+    this.gates.forEach(function (g, gi) {
+      g.ins.forEach(function (i) {
+        if (self.driver[i] >= 0) { indeg[gi]++; users[i].push(gi); }
+      });
+    });
+    var queue = [], order = [];
+    for (var i = 0; i < n; i++) if (indeg[i] === 0) queue.push(i);
+    while (queue.length) {
+      var gi = queue.shift(); order.push(gi);
+      users[this.gates[gi].out].forEach(function (u) { if (--indeg[u] === 0) queue.push(u); });
+    }
+    if (order.length !== n) throw new Error('組み合わせ回路にループがあります');
+    this.ffs.forEach(function (f) { if (f.d < 0) throw new Error('D入力が未接続のフリップフロップ: ' + self.names[f.q]); });
+    this.order = order;
+  };
+  Circuit.prototype.settle = function () {
+    if (!this.order) this._sort();
+    var v = this.values, gates = this.gates, order = this.order;
+    for (var k = 0; k < order.length; k++) {
+      var g = gates[order[k]], ins = g.ins, r, i;
+      switch (g.type) {
+        case 'NOT': r = v[ins[0]] ^ 1; break;
+        case 'AND': r = 1; for (i = 0; i < ins.length; i++) r &= v[ins[i]]; break;
+        case 'OR': r = 0; for (i = 0; i < ins.length; i++) r |= v[ins[i]]; break;
+        case 'XOR': r = v[ins[0]] ^ v[ins[1]]; break;
+        default: throw new Error('未知のゲート: ' + g.type);
+      }
+      v[g.out] = r;
+    }
+  };
+  Circuit.prototype.set = function (net, bit) {
+    if (!this.inputs[net]) throw new Error('入力ではないネットには書き込めません');
+    this.values[net] = bit ? 1 : 0;
+  };
+  // クロックの立ち上がり：全FFが同時にD入力を取り込み、その後の組み合わせ回路を安定させる。
+  Circuit.prototype.clock = function () {
+    this.settle();
+    var v = this.values;
+    var next = this.ffs.map(function (f) { return v[f.d]; });
+    this.ffs.forEach(function (f, i) { v[f.q] = next[i]; });
+    this.settle();
+  };
+  Circuit.prototype.resetFFs = function () {
+    var v = this.values;
+    this.ffs.forEach(function (f) { v[f.q] = 0; });
+    this.settle();
+  };
+
+  /* ---- 部品（74シリーズ相当をゲートで構成） ---- */
+  function mux2(c, s, a, b) { return c.or(c.and(a, c.not(s)), c.and(b, s)); }
+  function fullAdder(c, a, b, cin) {
+    var x = c.xor(a, b);
+    return { s: c.xor(x, cin), co: c.or(c.and(a, b), c.and(x, cin)) };
+  }
+  function adder4(c, a, b) {
+    var carry = c.ZERO, sum = [];
+    for (var i = 0; i < 4; i++) { var fa = fullAdder(c, a[i], b[i], carry); sum.push(fa.s); carry = fa.co; }
+    return { sum: sum, carry: carry };
+  }
+  function incrementer(c, q) {
+    var carry = c.ONE, out = [];
+    for (var i = 0; i < q.length; i++) { out.push(c.xor(q[i], carry)); carry = c.and(q[i], carry); }
+    return out;
+  }
+  function decoder4to16(c, a) {
+    var na = a.map(function (x) { return c.not(x); }), lines = [];
+    for (var k = 0; k < 16; k++) {
+      lines.push(c.and.apply(c, a.map(function (x, i) { return (k >> i) & 1 ? x : na[i]; })));
+    }
+    return lines;
+  }
+  function register(c, name, width) {
+    var ffs = [];
+    for (var i = 0; i < width; i++) ffs.push(c.dff(name + i));
+    return ffs;
+  }
+  function qOf(ffs) { return ffs.map(function (f) { return f.q; }); }
+
+  /* ---- TD4 本体 ---- */
+  function build() {
+    var c = new Circuit();
+    c.block = '入力・ROMスイッチ';
+    var IN = c.inputBus('IN', 4), sw = [];
+    for (var a = 0; a < 16; a++) sw.push(c.inputBus('ROM' + a + '_', 8));
+
+    c.block = 'レジスタ (A/B/OUT/C)';
+    var A = register(c, 'A', 4), B = register(c, 'B', 4), OUT = register(c, 'OUT', 4), C = c.dff('C');
+    c.block = 'プログラムカウンタ';
+    var PC = register(c, 'PC', 4);
+
+    // ROM：PC をデコードし、選ばれた行の DIP スイッチを OR でまとめる（ダイオードマトリクス相当）
+    c.block = 'ROM (デコーダ+スイッチ)';
+    var lines = decoder4to16(c, qOf(PC)), data = [];
+    for (var j = 0; j < 8; j++) {
+      data.push(c.or.apply(c, lines.map(function (ln, addr) { return c.and(ln, sw[addr][j]); })));
+    }
+    var im = data.slice(0, 4), D4 = data[4], D5 = data[5], D6 = data[6], D7 = data[7];
+
+    // 命令デコーダ
+    c.block = '命令デコーダ';
+    var SA = c.or(D4, D7), SB = c.or(D5);
+    var nD6 = c.not(D6), nD7 = c.not(D7);
+    var loadA = c.and(nD7, nD6), loadB = c.and(nD7, D6), loadOut = c.and(D7, nD6);
+    var loadPC = c.and(D7, D6, c.or(D4, c.not(C.q)));
+
+    // データセレクタ（74HC153 相当）：00=A 01=B 10=IN 11=0
+    c.block = 'データセレクタ';
+    var nSA = c.not(SA), nSB = c.not(SB), sel = [];
+    for (var i = 0; i < 4; i++) {
+      sel.push(c.or(c.and(A[i].q, nSA, nSB), c.and(B[i].q, SA, nSB), c.and(IN[i], nSA, SB), c.and(c.ZERO, SA, SB)));
+    }
+
+    c.block = 'ALU (4bit加算器)';
+    var alu = adder4(c, sel, im);
+
+    c.block = 'レジスタ (A/B/OUT/C)';
+    [[A, loadA], [B, loadB], [OUT, loadOut]].forEach(function (pair) {
+      pair[0].forEach(function (f, i) { f.d = mux2(c, pair[1], f.q, alu.sum[i]); });
+    });
+    C.d = alu.carry;
+
+    c.block = 'プログラムカウンタ';
+    var inc = incrementer(c, qOf(PC));
+    PC.forEach(function (f, i) { f.d = mux2(c, loadPC, inc[i], alu.sum[i]); });
+
+    c.settle();
+    return {
+      circuit: c,
+      pins: {
+        IN: IN, rom: sw, data: data, im: im, op: [D4, D5, D6, D7], SA: SA, SB: SB,
+        sel: sel, sum: alu.sum, carry: alu.carry,
+        loadA: loadA, loadB: loadB, loadOut: loadOut, loadPC: loadPC,
+        A: qOf(A), B: qOf(B), OUT: qOf(OUT), PC: qOf(PC), C: C.q
+      }
+    };
+  }
+
+  function Machine() {
+    var b = build();
+    this.circuit = b.circuit; this.pins = b.pins; this.cycles = 0;
+    this.rom = new Array(16).fill(0);
+  }
+  Machine.prototype.read = function (bus) {
+    var v = this.circuit.values, x = 0;
+    if (typeof bus === 'number') return v[bus];
+    for (var i = bus.length - 1; i >= 0; i--) x = (x << 1) | v[bus[i]];
+    return x;
+  };
+  Machine.prototype._write = function (bus, value) {
+    for (var i = 0; i < bus.length; i++) this.circuit.set(bus[i], (value >> i) & 1);
+  };
+  Machine.prototype.setRom = function (bytes) {
+    for (var a = 0; a < 16; a++) { this.rom[a] = (bytes[a] || 0) & 0xff; this._write(this.pins.rom[a], this.rom[a]); }
+    this.circuit.settle();
+  };
+  Machine.prototype.setIn = function (v) { this._write(this.pins.IN, v & 15); this.circuit.settle(); };
+  Machine.prototype.step = function () { this.circuit.clock(); this.cycles++; };
+  Machine.prototype.reset = function () { this.circuit.resetFFs(); this.cycles = 0; };
+  Machine.prototype.state = function () {
+    var p = this.pins, r = this.read.bind(this);
+    return {
+      pc: r(p.PC), a: r(p.A), b: r(p.B), out: r(p.OUT), c: r(p.C), in: r(p.IN),
+      data: r(p.data), op: r(p.op), im: r(p.im), select: (r(p.SB) << 1) | r(p.SA),
+      sel: r(p.sel), sum: r(p.sum), carry: r(p.carry),
+      loadA: r(p.loadA), loadB: r(p.loadB), loadOut: r(p.loadOut), loadPC: r(p.loadPC),
+      cycles: this.cycles
+    };
+  };
+  Machine.prototype.stats = function () {
+    var total = {}, s = this.circuit.stats;
+    Object.keys(s).forEach(function (blk) {
+      Object.keys(s[blk]).forEach(function (t) { total[t] = (total[t] || 0) + s[blk][t]; });
+    });
+    return { byBlock: s, total: total };
+  };
+
+  /* ---- アセンブラ / 逆アセンブラ ---- */
+  var ISA = [
+    ['ADD A,Im', 0x0], ['MOV A,B', 0x1], ['IN A', 0x2], ['MOV A,Im', 0x3],
+    ['MOV B,A', 0x4], ['ADD B,Im', 0x5], ['IN B', 0x6], ['MOV B,Im', 0x7],
+    ['OUT B', 0x9], ['OUT Im', 0xB], ['JNC Im', 0xE], ['JMP Im', 0xF]
+  ];
+  var PATTERNS = ISA.map(function (e) {
+    var re = '^' + e[0].replace(/ /g, '\\s+').replace(',', '\\s*,\\s*').replace('Im', '(\\S+)') + '$';
+    return { re: new RegExp(re, 'i'), op: e[1], hasIm: e[0].indexOf('Im') >= 0 };
+  });
+  function parseNumber(s) {
+    var t = s.trim().toLowerCase(), v;
+    if (/^0b[01]+$/.test(t)) v = parseInt(t.slice(2), 2);
+    else if (/^0x[0-9a-f]+$/.test(t)) v = parseInt(t.slice(2), 16);
+    else if (/^\d+$/.test(t)) v = parseInt(t, 10);
+    else return null;
+    return v;
+  }
+  function assemble(src) {
+    var bytes = [], errors = [];
+    src.split(/\r?\n/).forEach(function (raw, idx) {
+      var line = raw.replace(/[;#].*$/, '').trim();
+      if (!line) return;
+      var hit = null, m = null;
+      for (var k = 0; k < PATTERNS.length && !hit; k++) {
+        m = line.match(PATTERNS[k].re);
+        if (m) hit = PATTERNS[k];
+      }
+      if (!hit) { errors.push((idx + 1) + '行目：命令が分かりません「' + line + '」'); return; }
+      var im = 0;
+      if (hit.hasIm) {
+        im = parseNumber(m[1]);
+        if (im === null || im > 15) { errors.push((idx + 1) + '行目：Im は 0〜15 の数値です「' + m[1] + '」'); return; }
+      }
+      bytes.push((hit.op << 4) | im);
+    });
+    if (bytes.length > 16) errors.push('命令が ' + bytes.length + ' 個あります（ROM は16語まで）');
+    while (bytes.length < 16) bytes.push(0);
+    return { bytes: bytes.slice(0, 16), errors: errors };
+  }
+  function bin4(v) { return (v & 15).toString(2).padStart(4, '0'); }
+  function disassemble(byte) {
+    var op = (byte >> 4) & 15, im = byte & 15;
+    for (var k = 0; k < ISA.length; k++) {
+      if (ISA[k][1] === op) {
+        var mn = ISA[k][0];
+        if (mn.indexOf('Im') < 0) return mn;
+        return mn.replace('Im', op === 0xB ? '0b' + bin4(im) : String(im));
+      }
+    }
+    return '（未定義 ' + bin4(op) + '）';
+  }
+
+  var SAMPLES = [
+    { name: 'LEDが左右に流れる', src:
+      '; LEDが左右に流れる（ナイトライダー風）\nOUT 0b0011\nOUT 0b0110\nOUT 0b1100\nOUT 0b1000\nOUT 0b1000\nOUT 0b1100\nOUT 0b0110\nOUT 0b0011\nOUT 0b0001\nJMP 0\n' },
+    { name: '2進カウンタ', src:
+      '; OUT に 0,1,2,…15 を順に表示\nMOV B,0\nOUT B      ; 1番地\nADD B,1\nJMP 1\n' },
+    { name: 'タイマー（3段階→点滅）', src:
+      '; A を 16回数えるループで待ち、LEDを減らしていく\nOUT 0b0111\nADD A,1    ; 1番地\nJNC 1      ; 桁上がりするまで繰り返す\nOUT 0b0011\nADD A,1    ; 4番地\nJNC 4\nOUT 0b0001\nADD A,1    ; 7番地\nJNC 7\nOUT 0b1111 ; 9番地：終了。点滅\nOUT 0b0000\nJMP 9\n' },
+    { name: '入力をそのまま出力', src:
+      '; 入力スイッチの値を LED に出す\nIN B\nOUT B\nJMP 0\n' },
+    { name: '入力 + 3 を出力', src:
+      '; 加算器の動きを見る\nIN A\nADD A,3\nMOV B,A\nOUT B\nJMP 0\n' }
+  ];
+
+  var api = { Circuit: Circuit, Machine: Machine, assemble: assemble, disassemble: disassemble, bin4: bin4, ISA: ISA, SAMPLES: SAMPLES };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  return api;
+})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var m = new TD4.Machine(), bin4 = TD4.bin4, $ = function (id) { return document.getElementById(id); };
+  var inValue = 0, timer = null;
+
+  /* ---- 入力スイッチ / LED ---- */
+  var swWrap = $('in-sw'), ledWrap = $('out-led'), swBtns = [], leds = [];
+  for (var bit = 3; bit >= 0; bit--) {
+    (function (b) {
+      var btn = document.createElement('button');
+      btn.className = 'sw mono'; btn.textContent = '0'; btn.title = 'bit' + b;
+      btn.addEventListener('click', function () { inValue ^= 1 << b; m.setIn(inValue); render(); });
+      swWrap.appendChild(btn); swBtns[b] = btn;
+      var led = document.createElement('span'); led.textContent = b; ledWrap.appendChild(led); leds[b] = led;
+    })(bit);
+  }
+
+  /* ---- ROM 表 ---- */
+  var romTable = $('rom'), romRows = [], romBits = [];
+  romTable.innerHTML = '<tr><th>番地</th><th>命令（bit7…4）　Im（bit3…0）</th><th>意味</th></tr>';
+  for (var a = 0; a < 16; a++) {
+    var tr = document.createElement('tr'), tdA = document.createElement('td'), tdB = document.createElement('td'), tdM = document.createElement('td');
+    tdA.className = 'mono'; tdA.textContent = bin4(a) + ' (' + a + ')';
+    tdM.className = 'asm-col mono';
+    romBits[a] = [];
+    for (var j = 7; j >= 0; j--) {
+      (function (addr, b) {
+        var btn = document.createElement('button');
+        btn.className = 'bit mono' + (b === 3 ? ' gap' : '');
+        btn.addEventListener('click', function () {
+          var bytes = m.rom.slice(); bytes[addr] ^= 1 << b;
+          m.setRom(bytes); syncSourceFromRom(); render();
+        });
+        tdB.appendChild(btn); romBits[addr][b] = btn;
+      })(a, j);
+    }
+    tr.appendChild(tdA); tr.appendChild(tdB); tr.appendChild(tdM); romTable.appendChild(tr);
+    romRows.push({ tr: tr, mn: tdM });
+  }
+
+  /* ---- アセンブラ ---- */
+  var sampleSel = $('sample');
+  TD4.SAMPLES.forEach(function (s, i) {
+    var o = document.createElement('option'); o.value = i; o.textContent = 'サンプル：' + s.name; sampleSel.appendChild(o);
+  });
+  sampleSel.addEventListener('change', function () { $('src').value = TD4.SAMPLES[sampleSel.value].src; writeRom(); });
+  $('btn-asm').addEventListener('click', writeRom);
+  function writeRom() {
+    var r = TD4.assemble($('src').value), msg = $('asm-msg');
+    if (r.errors.length) { msg.className = 'msg err'; msg.textContent = r.errors.join(' / '); return; }
+    stop(); m.setRom(r.bytes); m.reset();
+    msg.className = 'msg ok'; msg.textContent = 'ROM に書き込み、リセットしました。';
+    render();
+  }
+  function syncSourceFromRom() {
+    var last = 15;
+    while (last > 0 && m.rom[last] === 0) last--;
+    var lines = [];
+    for (var a = 0; a <= last; a++) lines.push(TD4.disassemble(m.rom[a]).padEnd(12) + '; ' + a + '番地');
+    $('src').value = '; ROM から逆アセンブル\n' + lines.join('\n') + '\n';
+    $('asm-msg').className = 'msg'; $('asm-msg').textContent = 'ROM のスイッチを直接変更しました。';
+  }
+
+  /* ---- 実行 ---- */
+  $('btn-step').addEventListener('click', function () { m.step(); render(); });
+  $('btn-reset').addEventListener('click', function () { m.reset(); render(); });
+  $('btn-run').addEventListener('click', function () { timer ? stop() : start(); });
+  $('speed').addEventListener('change', function () { if (timer) { stop(); start(); } });
+  function start() {
+    var hz = +$('speed').value;
+    timer = setInterval(function () { m.step(); render(); }, 1000 / hz);
+    $('btn-run').textContent = '■ 停止';
+  }
+  function stop() { if (timer) clearInterval(timer); timer = null; $('btn-run').textContent = '▶ 自動実行'; }
+
+  /* ---- 回路の規模 ---- */
+  (function () {
+    var st = m.stats(), types = ['NOT', 'AND', 'OR', 'XOR', 'DFF'];
+    var html = '<tr><th>ブロック</th>' + types.map(function (t) { return '<th>' + t + '</th>'; }).join('') + '<th>計</th></tr>';
+    Object.keys(st.byBlock).forEach(function (blk) {
+      var row = st.byBlock[blk], sum = 0;
+      html += '<tr><td>' + blk + '</td>' + types.map(function (t) { sum += row[t] || 0; return '<td class="mono">' + (row[t] || '') + '</td>'; }).join('') + '<td class="mono">' + (sum || '') + '</td></tr>';
+    });
+    var all = 0;
+    html += '<tr><th>合計</th>' + types.map(function (t) { all += st.total[t] || 0; return '<th class="mono">' + (st.total[t] || 0) + '</th>'; }).join('') + '<th class="mono">' + all + '</th></tr>';
+    $('stats').innerHTML = html;
+  })();
+
+  /* ---- 描画 ---- */
+  var SEL_NAMES = ['A', 'B', 'IN', '0'];
+  function setText(id, t) { $(id).textContent = t; }
+  function cls(id, name, on) { $(id).classList.toggle(name, !!on); }
+  function render() {
+    var s = m.state(), mn = TD4.disassemble(s.data);
+    // 回路図
+    setText('v-addr', bin4(s.pc)); cls('w-addr', 'on', s.pc);
+    setText('v-op', bin4(s.op)); cls('w-op', 'on', s.op);
+    setText('v-im', bin4(s.im)); cls('w-im', 'on', s.im);
+    setText('v-sel', ((s.select >> 1) & 1) + '' + (s.select & 1) + '→' + SEL_NAMES[s.select]); cls('c-sel', 'on', true);
+    setText('v-selout', bin4(s.sel)); cls('w-selout', 'on', s.sel);
+    setText('v-sum', bin4(s.sum)); cls('w-sum', 'on', s.sum);
+    setText('v-carry', s.carry); cls('c-carry', 'on', s.carry);
+    setText('v-a', bin4(s.a)); cls('w-a', 'on', s.a);
+    setText('v-b', bin4(s.b)); cls('w-b', 'on', s.b);
+    setText('v-in', bin4(s.in)); cls('w-in', 'on', s.in);
+    cls('w-out', 'on', s.out);
+    cls('c-load', 'on', s.loadA || s.loadB || s.loadOut);
+    cls('c-pc', 'on', s.loadPC);
+    cls('c-c2dec', 'on', s.c);
+    setText('t-rom', bin4(s.op) + ' ' + bin4(s.im)); setText('t-mn', mn);
+    setText('t-pc', bin4(s.pc)); setText('t-pcnext', s.loadPC ? '次：ジャンプ' : '次：+1');
+    setText('t-in', bin4(s.in));
+    setText('t-dec', mn);
+    setText('t-dec2', 'セレクタ選択：' + SEL_NAMES[s.select]);
+    setText('t-sel', bin4(s.sel) + '（' + SEL_NAMES[s.select] + '）');
+    setText('t-alu', bin4(s.sum)); setText('t-alu2', bin4(s.sel) + ' + ' + bin4(s.im));
+    setText('t-c', s.c);
+    setText('t-a', bin4(s.a)); setText('t-b', bin4(s.b)); setText('t-out', bin4(s.out));
+    cls('l-a', 'on', s.loadA); cls('l-b', 'on', s.loadB); cls('l-out', 'on', s.loadOut);
+    cls('b-a', 'active', s.loadA); cls('b-b', 'active', s.loadB); cls('b-out', 'active', s.loadOut); cls('b-pc', 'active', s.loadPC);
+    var svgLeds = document.querySelectorAll('#leds circle');
+    for (var i = 0; i < 4; i++) svgLeds[i].classList.toggle('on', (s.out >> (3 - i)) & 1);
+
+    // 操作パネル
+    setText('cycles', s.cycles);
+    for (var b = 0; b < 4; b++) {
+      swBtns[b].textContent = (s.in >> b) & 1; swBtns[b].classList.toggle('on', (s.in >> b) & 1);
+      leds[b].classList.toggle('on', (s.out >> b) & 1);
+    }
+    [['a', s.a], ['b', s.b], ['out', s.out], ['pc', s.pc]].forEach(function (r) {
+      setText('r-' + r[0], bin4(r[1])); setText('r-' + r[0] + '10', r[1]);
+    });
+    setText('r-c', s.c);
+    var sigs = [['SELECT A（下位）', s.select & 1], ['SELECT B（上位）', s.select >> 1], ['LOAD A', s.loadA], ['LOAD B', s.loadB], ['LOAD OUT', s.loadOut], ['LOAD PC', s.loadPC]];
+    $('sigs').innerHTML = sigs.map(function (x) { return '<span><i class="' + (x[1] ? 'on' : '') + '"></i>' + x[0] + '</span>'; }).join('');
+    var dst = s.loadA ? 'A' : s.loadB ? 'B' : s.loadOut ? 'OUT' : null;
+    var next = '実行中の命令：<b class="mono">' + mn + '</b><br>次のクロックで：';
+    next += dst ? dst + ' ← ' + bin4(s.sum) : 'レジスタは変化なし';
+    next += '、PC ← ' + (s.loadPC ? bin4(s.sum) + '（ジャンプ）' : bin4((s.pc + 1) & 15)) + '、C ← ' + s.carry;
+    $('next').innerHTML = next;
+
+    // ROM 表
+    for (var a = 0; a < 16; a++) {
+      romRows[a].tr.classList.toggle('pc', a === s.pc);
+      romRows[a].mn.textContent = TD4.disassemble(m.rom[a]);
+      for (var j = 0; j < 8; j++) {
+        var on = (m.rom[a] >> j) & 1;
+        romBits[a][j].textContent = on; romBits[a][j].classList.toggle('on', on);
+      }
+    }
+  }
+
+  $('src').value = TD4.SAMPLES[0].src;
+  writeRom();
+  $('asm-msg').textContent = '';
+})();
+</script>
+</body>
+</html>
